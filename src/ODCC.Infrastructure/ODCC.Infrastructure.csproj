@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    لایه‌ی زیرساخت (Infrastructure):
+    Entity Framework Core، مخزن‌ها، یکپارچه‌سازی با سرویس‌های خارجی.
+    فقط از طریق قراردادهای لایه‌ی کاربرد با سایر ماژول‌ها صحبت می‌کند.
+  -->
+
+  <!--
+    این لایه به ASP.NET Core نیاز دارد ( IHttpContextAccessor ، Identity در فاز ۱ ).
+    پکیج Microsoft.AspNetCore.Identity.EntityFrameworkCore این فریم‌ورک را می‌آورد،
+    اما در یک classlib باید ارجاع صریح شود تا اسمبلی‌های مشترک (مثل EF Core) به‌درستی حل شوند.
+  -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
+    <PackageReference Include="QuestPDF" />
+  </ItemGroup>
+
+</Project>

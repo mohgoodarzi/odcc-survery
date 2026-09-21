@@ -1,0 +1,101 @@
+@import 'tailwindcss';
+
+/*
+ * سیستم طراحی سامانه‌ی نظرسنجی سازمانی.
+ * تمام خصوصیات منطقی (logical) هستند، بنابراین یک استایل‌شیت واحد
+ * با تغییر dir به RTL/LTR برمی‌گردد.
+ */
+
+@theme {
+  --font-sans: 'Vazirmatn', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --color-brand-50: oklch(0.97 0.02 260);
+  --color-brand-100: oklch(0.94 0.04 260);
+  --color-brand-200: oklch(0.88 0.07 260);
+  --color-brand-300: oklch(0.8 0.11 260);
+  --color-brand-400: oklch(0.71 0.15 260);
+  --color-brand-500: oklch(0.62 0.19 262);
+  --color-brand-600: oklch(0.53 0.2 263);
+  --color-brand-700: oklch(0.45 0.18 264);
+  --color-brand-800: oklch(0.38 0.14 264);
+  --color-brand-900: oklch(0.32 0.1 264);
+  --color-brand-950: oklch(0.24 0.06 264);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
+
+/*
+ * نگاشت توکن‌های تم به ابزارهای Tailwind.
+ * این بلوک باید inline باشد تا تغییر متغیرهای :root/.dark در زمان اجرا
+ * روی ابزارهایی مثل bg-primary اثر بگذارد (پشتیبانی از حالت تاریک).
+ */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-ring: var(--ring);
+}
+
+:root {
+  --radius: 0.625rem;
+
+  --background: oklch(0.99 0.002 250);
+  --foreground: oklch(0.18 0.02 264);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.02 264);
+  --muted: oklch(0.96 0.004 250);
+  --muted-foreground: oklch(0.5 0.015 264);
+  --border: oklch(0.91 0.005 250);
+  --input: oklch(0.91 0.005 250);
+  --primary: var(--color-brand-600);
+  --primary-foreground: oklch(0.99 0.002 250);
+  --accent: oklch(0.96 0.01 260);
+  --accent-foreground: var(--color-brand-700);
+  --ring: var(--color-brand-500);
+}
+
+.dark {
+  --background: oklch(0.16 0.02 264);
+  --foreground: oklch(0.97 0.004 250);
+  --card: oklch(0.2 0.02 264);
+  --card-foreground: oklch(0.97 0.004 250);
+  --muted: oklch(0.25 0.02 264);
+  --muted-foreground: oklch(0.68 0.015 264);
+  --border: oklch(0.28 0.02 264);
+  --input: oklch(0.28 0.02 264);
+  --primary: var(--color-brand-400);
+  --primary-foreground: oklch(0.16 0.02 264);
+  --accent: oklch(0.28 0.03 264);
+  --accent-foreground: var(--color-brand-200);
+  --ring: var(--color-brand-400);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* مقادیر LTR-only مثل ایمیل داخل صفحه‌ی RTL درست نمایش داده شوند. */
+  [dir='ltr'] .ltr-only {
+    direction: ltr;
+  }
+}

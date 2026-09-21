@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    ریشه‌ی ترکیب (Composition Root):
+    تنها جایی است که تمام لایه‌ها به هم وصل می‌شوند.
+    کنترلرها، میان‌افزارها، احراز هویت و میزبان SPA.
+  -->
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <!-- متد AddDbContextCheck<> (بررسی سلامت SQL Server) را فراهم می‌کند. -->
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" />
+  </ItemGroup>
+
+</Project>

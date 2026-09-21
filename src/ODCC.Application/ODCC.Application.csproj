@@ -1,0 +1,13 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    لایه‌ی کاربرد (Application):
+    DTOها، قراردادهای ماژول‌ها، سرویس‌های کاربردی.
+    فقط به لایه‌ی دامنه ارجاع دارد.
+  -->
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+</Project>

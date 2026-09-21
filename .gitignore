@@ -1,0 +1,32 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+publish/
+*.pubxml
+
+# اسرار — هرگز کامیت نشوند
+appsettings.*.Production.json
+.env
+*.pfx
+secrets.json
+
+# Node
+node_modules/
+web/dist/
+web/.vite/
+
+# IDE / OS
+.vs/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Build artifacts
+TestResults/

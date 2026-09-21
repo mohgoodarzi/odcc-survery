@@ -1,0 +1,25 @@
+using System.Linq.Expressions;
+using ODCC.Domain.Common;
+
+namespace ODCC.Application.Abstractions;
+
+/// <summary>
+/// واحد کار: یک مرز تراکنشی واحد برای چند عملیات نوشتن.
+/// <see cref="SaveChangesAsync"/> تمام تغییرات DbContext جاری را در یک تراکنش ذخیره می‌کند
+/// و همزمان رویدادهای دامنه‌ی منتشرنشده را هم قبل از commit تحویل می‌دهد.
+/// </summary>
+public interface IUnitOfWork
+{
+    Task<int> SaveChangesAsync(CancellationToken ct = default);
+}
+
+/// <summary>
+/// مشخصه‌ی پرس‌وجوی قابل‌استفاده مجدد: فیلتر، مرتب‌سازی و بارگذاری ناوبری.
+/// </summary>
+public interface ISpecification<T> where T : BaseEntity
+{
+    Expression<Func<T, bool>>? Criteria { get; }
+    Expression<Func<T, object>>[] OrderBy { get; }
+    int? Take { get; }
+    int? Skip { get; }
+}

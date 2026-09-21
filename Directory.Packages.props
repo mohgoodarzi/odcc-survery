@@ -1,0 +1,46 @@
+<Project>
+
+  <!--
+    مدیریت مرکزی نسخه‌ی پکیج‌ها.
+    هر نسخه دقیقاً یک بار در این فایل تعریف می‌شود تا تمام ماژول‌ها روی یک نسخه‌ی
+    هماهنگ (نسل .NET 10) بیلد شوند و درگیری نسخه پیش نیاید.
+  -->
+
+  <PropertyGroup>
+    <MicrosoftExtensionsVersion>10.0.11</MicrosoftExtensionsVersion>
+    <EntityFrameworkCoreVersion>10.0.11</EntityFrameworkCoreVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- ASP.NET Core / OpenAPI -->
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="$(MicrosoftExtensionsVersion)" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="$(MicrosoftExtensionsVersion)" />
+    <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="$(EntityFrameworkCoreVersion)" />
+
+    <!-- بررسی سلامت مبتنی بر EF Core (متد AddDbContextCheck را فراهم می‌کند) -->
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="$(MicrosoftExtensionsVersion)" />
+
+    <!-- Entity Framework Core + SQL Server -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="$(EntityFrameworkCoreVersion)" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="$(EntityFrameworkCoreVersion)" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="$(EntityFrameworkCoreVersion)" />
+
+    <!-- انتزاع‌های تزریق وابستگی و میزبان -->
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="$(MicrosoftExtensionsVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="$(MicrosoftExtensionsVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="$(MicrosoftExtensionsVersion)" />
+
+    <!-- گزارش‌گیری PDF با پشتیبانی کامل از فارسی و RTL -->
+    <PackageVersion Include="QuestPDF" Version="2025.1.3" />
+
+    <!-- آزمون‌ها -->
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.0.2" />
+    <PackageVersion Include="FluentAssertions" Version="7.2.0" />
+    <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />
+    <PackageVersion Include="Testcontainers.MsSql" Version="4.4.0" />
+    <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+  </ItemGroup>
+
+</Project>

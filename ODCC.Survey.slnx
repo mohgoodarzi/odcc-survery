@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ODCC.Api/ODCC.Api.csproj" />
+    <Project Path="src/ODCC.Application/ODCC.Application.csproj" />
+    <Project Path="src/ODCC.Domain/ODCC.Domain.csproj" />
+    <Project Path="src/ODCC.Infrastructure/ODCC.Infrastructure.csproj" />
+  </Folder>
+</Solution>
