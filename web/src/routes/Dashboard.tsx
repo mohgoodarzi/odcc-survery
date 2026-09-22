@@ -1,18 +1,19 @@
 import { useLanguage } from '@/i18n/LanguageProvider';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatCount } from '@/i18n/format';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AppLayout } from '@/layouts/AppLayout';
 
 /**
  * داشبورد — در فاز ۱ با داده‌های واقعی پر می‌شود.
  */
 export function Dashboard() {
-  const { t } = useLanguage();
+  const { t, culture } = useLanguage();
 
   const stats = [
     { label: t.nav.surveys, value: 12 },
     { label: t.nav.campaigns, value: 4 },
-    { label: 'پاسخ‌ها', value: 1280 },
-    { label: 'NPS میانگین', value: 42 }
+    { label: t.dashboard.responses, value: 1280 },
+    { label: t.dashboard.averageNps, value: 42 }
   ];
 
   return (
@@ -27,9 +28,8 @@ export function Dashboard() {
           <Card key={stat.label}>
             <CardHeader>
               <CardDescription>{stat.label}</CardDescription>
-              <CardTitle className="text-3xl">{stat.value}</CardTitle>
+              <CardTitle className="text-3xl">{formatCount(stat.value, culture)}</CardTitle>
             </CardHeader>
-            <CardContent />
           </Card>
         ))}
       </div>

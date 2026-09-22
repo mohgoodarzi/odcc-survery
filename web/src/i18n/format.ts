@@ -14,6 +14,14 @@ export function formatNumber(value: number, culture: Culture): string {
 }
 
 /**
+ * اعداد صحیح با جداکننده‌ی هزارگان و ارقام محلی (مثلاً ۱۲۸۰ → ۱٬۲۸۰).
+ * برای شمارنده‌ها و آمارها؛ برخلاف formatNumber که خلاصه‌سازی می‌کند.
+ */
+export function formatCount(value: number, culture: Culture): string {
+  return new Intl.NumberFormat(CULTURE_TO_LOCALE[culture]).format(value);
+}
+
+/**
  * تاریخ را به‌صورت محلی نمایش می‌دهد. ورودی همواره ISO 8601 میلادی/UTC است؛
  * تقویم جلالی فقط در لایه‌ی نمایش و توسط مرورگر تبدیل می‌شود.
  */

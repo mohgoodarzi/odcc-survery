@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    آزمون‌های لایه‌ی زیرساخت: جریان‌های احراز هویت، چرخش توکن و
+    مرز دامنه‌ی سازمانی در سطح سرویس.
+
+    پایگاه‌داده: از SQLite درون‌حافظه‌ای استفاده می‌شود که در پایان هر آزمون
+    دور ریخته می‌شود. هیچ پایگاه‌داده‌ی واقعی هرگز ساخته/تغییر نمی‌کند و
+    هیچ مهاجرتی اعمال نمی‌شود.
+  -->
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <!-- روش نام‌گذاری آزمون‌های xUnit از زیرخط استفاده می‌کند. -->
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="coverlet.collector" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ODCC.Application\ODCC.Application.csproj" />
+    <ProjectReference Include="..\..\src\ODCC.Domain\ODCC.Domain.csproj" />
+    <ProjectReference Include="..\..\src\ODCC.Infrastructure\ODCC.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\ODCC.Api\ODCC.Api.csproj" />
+  </ItemGroup>
+
+</Project>

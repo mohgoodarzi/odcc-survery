@@ -14,6 +14,16 @@ public interface IUnitOfWork
 }
 
 /// <summary>
+/// مرز تراکنشی ماژول هویت. فقط این ماژول باید آن را تزریق بگیرد.
+/// </summary>
+public interface IIdentityUnitOfWork : IUnitOfWork;
+
+/// <summary>
+/// مرز تراکنشی ماژول سازمان. فقط این ماژول باید آن را تزریق بگیرد.
+/// </summary>
+public interface IOrganizationUnitOfWork : IUnitOfWork;
+
+/// <summary>
 /// مشخصه‌ی پرس‌وجوی قابل‌استفاده مجدد: فیلتر، مرتب‌سازی و بارگذاری ناوبری.
 /// </summary>
 public interface ISpecification<T> where T : BaseEntity

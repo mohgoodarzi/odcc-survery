@@ -29,4 +29,20 @@ public abstract class BaseEntity
     /// </summary>
     [Column("row_version")]
     public byte[] RowVersion { get; set; } = [];
+
+    /// <summary>
+    /// رویدادهای دامنه‌ی منتشرنشده‌ی این موجودیت.
+    /// لایه‌ی زیرساخت پس از ذخیره‌سازی موفق، آن‌ها را به
+    /// <c>IDomainEventDispatcher</c> تحویل می‌دهد و سپس پاک می‌کند.
+    /// این مجموعه هرگز null نیست.
+    /// </summary>
+    private readonly List<IDomainEvent> _domainEvents = [];
+
+    public IReadOnlyCollection<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
+
+    /// <summary>افزودن یک رویداد دامنه برای انتشار پس از commit.</summary>
+    public void RaiseDomainEvent(IDomainEvent domainEvent) => _domainEvents.Add(domainEvent);
+
+    /// <summary>پاک کردن رویدادهای منتشرشده (توسط UnitOfWork پس از تحویل).</summary>
+    public void ClearDomainEvents() => _domainEvents.Clear();
 }

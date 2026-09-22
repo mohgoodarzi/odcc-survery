@@ -19,16 +19,25 @@ public class AuditDbContext(DbContextOptions<AuditDbContext> options) : DbContex
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        var provider = Database.ProviderName;
+
         modelBuilder.Entity<AuditEntry>(b =>
         {
-            b.ConfigureBase("audit_entries");
+            b.ConfigureBase("audit_entries", provider);
             b.Property(e => e.UserName).HasMaxLength(256);
             b.Property(e => e.Action).HasMaxLength(64).IsRequired();
             b.Property(e => e.EntityType).HasMaxLength(128).IsRequired();
             b.Property(e => e.Severity).HasMaxLength(16);
             b.Property(e => e.ClientIp).HasMaxLength(64);
             b.Property(e => e.Description).HasMaxLength(1024);
-            b.Property(e => e.Changes).HasColumnType("nvarchar(max)");
+
+            // nvarchar(max) فقط در SQL Server معتبر است؛ SQLite طول نامحدود را
+            // با نوع TEXT و بدون تعیین حداکثر طول نمایش می‌دهد.
+            if (!string.Equals(provider, "Microsoft.EntityFrameworkCore.Sqlite", StringComparison.Ordinal))
+            {
+                b.Property(e => e.Changes).HasColumnType("nvarchar(max)");
+            }
+
             b.HasIndex(e => e.EntityType);
             b.HasIndex(e => e.UserId);
         });

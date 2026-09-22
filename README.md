@@ -42,12 +42,44 @@ setx ConnectionStrings__Default "Server=...;Database=...;User Id=...;Password=..
 > **توجه:** طبق سیاست پروژه، ایجاد/تغییر پایگاه داده نیازمند تأیید صریح است.
 > اجرای خودکار مهاجرت‌ها با `Database:AutoMigrate=false` به‌صورت پیش‌فرض غیرفعال است.
 
-پس از دریافت تأیید:
+هر ماژول DbContext و مهاجرت‌های مستقل خود را دارد که فقط جداول همان ماژول را
+ایجاد می‌کنند (مالکیت طرح بین ماژول‌ها حفظ می‌شود):
 
 ```powershell
+# ماژول ممیزی (ماژول مرجع)
 dotnet ef migrations add InitialCreate -p src/ODCC.Infrastructure -s src/ODCC.Api -c AuditDbContext
-dotnet ef database update       -p src/ODCC.Infrastructure -s src/ODCC.Api -c AuditDbContext
+
+# ماژول هویت (کاربران، نقش‌ها، توکن‌های تازه‌سازی)
+dotnet ef migrations add InitialCreate -p src/ODCC.Infrastructure -s src/ODCC.Api -c IdentityDbContext -o Modules/Identity/Persistence/Migrations
+
+# ماژول سازمان (واحدها، موقعیت‌ها، کارمندان)
+dotnet ef migrations add InitialCreate -p src/ODCC.Infrastructure -s src/ODCC.Api -c OrganizationDbContext -o Modules/Organization/Persistence/Migrations
+
+# اعمال همه‌ی مهاجرت‌ها (پس از تأیید)
+dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c AuditDbContext
+dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c IdentityDbContext
+dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c OrganizationDbContext
 ```
+
+> **هیچ‌کدام از این دستورات را تا دریافت تأیید اجرا نکنید.**
+
+### داده‌ی اولیه (Bootstrap)
+
+با فعال کردن `Database:AutoMigrate`، برنامه پس از اجرای مهاجرت‌ها به‌صورت
+خودتوان داده‌ی اولیه را ایجاد می‌کند: واحد سازمانی ریشه، نقش «مدیر سامانه» با
+تمام مجوزها (`IsSystem`) و کاربر مدیر کل با دامنه‌ی `Company`.
+
+رمز عبور مدیر کل باید از user secrets یا متغیر محیطی تامین شود — هرگز در
+مخزن کد:
+
+```powershell
+cd src/ODCC.Api
+dotnet user-secrets set "Seed:AdminPassword" "YourStrongPassword123!"
+dotnet user-secrets set "Jwt:Secret" "your-minimum-32-character-signing-key-here"
+```
+
+در صورت نبودن `Seed:AdminPassword`، ایجاد کاربر مدیر کل به‌صورت ایمن رد
+می‌شود (برنامه همچنان بوت می‌شود).
 
 ### اجرا
 
@@ -100,8 +132,11 @@ dotnet publish src/ODCC.Api -c Release -o ./publish
 
 ## وضعیت پروژه
 
-**فاز ۰ (زیرساخت و مبنا)** تکمیل شده است. به‌جز ماژول مرجع Audit، هیچ ماژول کسب‌وکاری
-هنوز پیاده‌سازی نشده است. به جدول فازها در پروژه‌ی معماری مراجعه کنید.
+**فاز ۰ (زیرساخت و مبنا)** و **فاز ۱ (هویت، مجوزدهی و سازمان)** پیاده‌سازی شده‌اند.
+ماژول‌های پیاده‌سازی‌شده تاکنون: Audit (ماژول مرجع)، Identity (کاربران، نقش‌ها،
+JWT، توکن‌های تازه‌سازی) و Organization (واحدهای سازمانی، موقعیت‌ها، کارمندان).
+سایر ماژول‌ها در فازهای بعدی ساخته می‌شوند. به جدول فازها در پروژه‌ی معماری
+مراجعه کنید.
 
 ## عیب‌یابی
 

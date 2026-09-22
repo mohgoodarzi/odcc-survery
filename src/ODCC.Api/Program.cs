@@ -1,4 +1,8 @@
 using System.Globalization;
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Localization.Routing;
 using Microsoft.AspNetCore.OpenApi;
@@ -7,11 +11,17 @@ using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
+using ODCC.Api.Authorization;
 using ODCC.Api.Middleware;
 using ODCC.Api.Routing;
 using ODCC.Application;
 using ODCC.Application.Languages;
 using ODCC.Infrastructure;
+using ODCC.Infrastructure.Modules.Identity;
+using ODCC.Infrastructure.Modules.Identity.Entities;
+using ODCC.Infrastructure.Modules.Identity.Persistence;
+using ODCC.Infrastructure.Modules.Organization.Persistence;
 using ODCC.Infrastructure.Persistence.Audit;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -24,6 +34,35 @@ var connectionString = builder.Configuration.GetConnectionString("Default");
 builder.Services.AddOdccInfrastructure(connectionString ?? string.Empty);
 builder.Services.AddOdccApplication();
 builder.Services.AddOdccDatabaseInitializer(builder.Configuration);
+
+// ---- احراز هویت و مجوزدهی -----------------------------------------------
+// تنظیمات JWT از پیکربندی (بخش Jwt). کلید باید حداقل ۳۲ کاراکتر باشد
+// و از user secrets یا متغیر محیطی تامین شود — هرگز در مخزن کد.
+var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
+
+if (string.IsNullOrWhiteSpace(jwtOptions.Secret) || jwtOptions.Secret.Length < 32)
+{
+    if (builder.Environment.IsDevelopment())
+    {
+        // در محیط توسعه فقط هشدار می‌دهیم تا بوت بدون کلید هم ممکن باشد.
+        Console.WriteLine("هشدار: کلید امضای JWT تنظیم نشده یا کوتاه است. احراز هویت کار نخواهد کرد.");
+    }
+    else
+    {
+        throw new InvalidOperationException(
+            "کلید امضای JWT یافت نشد یا کوتاه است. آن را با متغیر محیطی Jwt__Secret " +
+            "یا user secret تامین کنید. هرگز کلید واقعی را در مخزن کد قرار ندهید.");
+    }
+}
+else
+{
+    builder.Services.AddOdccJwtAuthentication(jwtOptions);
+}
+
+// مجوزدهی مبتنی بر مجوزهای پویا: PolicyProvider نیازی به ثبت تک‌تک مجوزها ندارد.
+builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
+builder.Services.AddScoped<IAuthorizationHandler, PermissionHandler>();
+builder.Services.AddAuthorization();
 
 // ---- ارائه -----------------------------------------------------------------
 // AddControllersWithViews (نه AddControllers): فیلتر ValidateAntiforgeryTokenAuthorizationFilter
@@ -99,9 +138,11 @@ builder.Services.AddHsts(options =>
 });
 
 // بررسی سلامت: مسیر واقعی داده را اجرا می‌کند؛ «سالم» یعنی برنامه واقعاً
-// می‌تواند با SQL Server صحبت کند.
+// می‌تواند با SQL Server صحبت کند. هر DbContext ماژول یک بررسی جداگانه است.
 builder.Services.AddHealthChecks()
-    .AddDbContextCheck<AuditDbContext>("sql-server-audit");
+    .AddDbContextCheck<AuditDbContext>("sql-server-audit")
+    .AddDbContextCheck<IdentityDbContext>("sql-server-identity")
+    .AddDbContextCheck<OrganizationDbContext>("sql-server-organization");
 
 var app = builder.Build();
 
@@ -134,6 +175,10 @@ app.UseRouting();
 
 // بعد از routing عمداً: RouteDataRequestCultureProvider به مقدار مسیر {culture} نیاز دارد.
 app.UseRequestLocalization();
+
+// احراز هویت باید قبل از مجوزدهی و قبل از endpointها باشد.
+app.UseAuthentication();
+app.UseAuthorization();
 
 if (allowedOrigins.Length > 0)
 {

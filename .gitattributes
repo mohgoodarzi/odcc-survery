@@ -1,0 +1,30 @@
+# پیکربندی خطوط فاصله‌ی یکپارچه در کل مخزن.
+# کد منبع همیشه LF است؛ Git در زمان checkout در ویندوز آن را به CRLF تبدیل می‌کند
+# و هنگام commit دوباره به LF برمی‌گرداند، تا فایل‌ها در همه‌ی پلتفرم‌ها یکسان بمانند.
+
+* text=auto eol=lf
+
+# فایل‌های بایننی هرگز نباید دستکاری خطوط شوند.
+*.svg   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.eot   binary
+*.pdf   binary
+*.pfx   binary
+*.zip   binary
+
+# فایل‌های راه‌حل و پروژه همیشه LF (حتی در ویندوز).
+*.slnx  text eol=lf
+*.csproj text eol=lf
+*.props text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.css   text eol=lf
+*.ts    text eol=lf
+*.tsx   text eol=lf

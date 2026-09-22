@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    آزمون‌های معماری: قواعد لایه‌بندی و مرز ماژول‌ها.
+    این پروژه به تمام لایه‌ها ارجاع دارد تا بتواند اسمبلی‌ها را بازرسی کند،
+    اما هرگز نباید در زمان اجرا به آن‌ها وابسته باشد (فقط NetArchTest).
+  -->
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <!-- روش نام‌گذاری آزمون‌های xUnit از زیرخط استفاده می‌کند. -->
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="NetArchTest.Rules" />
+    <PackageReference Include="coverlet.collector" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ODCC.Api\ODCC.Api.csproj" />
+    <ProjectReference Include="..\..\src\ODCC.Application\ODCC.Application.csproj" />
+    <ProjectReference Include="..\..\src\ODCC.Domain\ODCC.Domain.csproj" />
+    <ProjectReference Include="..\..\src\ODCC.Infrastructure\ODCC.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

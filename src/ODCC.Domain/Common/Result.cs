@@ -24,14 +24,17 @@ public class Result
     /// <summary>نتیجه‌ی ناموفق بدون مقدار.</summary>
     public static Result Failure(AppError error) => new(isSuccess: false, error);
 
-    /// <summary>نتیجه‌ی ناموفق با کد و پیام.</summary>
+    /// <summary>نتیجه‌ی ناموفق بدون مقدار.</summary>
     public static Result Failure(string code, string message) => Failure(new AppError(code, message));
-
-    /// <summary>نتیجه‌ی موفق دارای مقدار. نوع <typeparamref name="T"/> از آرگومان استنتاج می‌شود.</summary>
-    public static Result<T> Success<T>(T value) => new(isSuccess: true, value, AppError.None);
 
     /// <summary>نتیجه‌ی ناموفق دارای مقدار (مقدار <c>null</c>). نوع باید صریحاً داده شود.</summary>
     public static Result<T> Failure<T>(AppError error) => new(isSuccess: false, default, error);
+
+    /// <summary>نتیجه‌ی ناموفق دارای مقدار (مقدار <c>null</c>). نوع باید صریحاً داده شود.</summary>
+    public static Result<T> Failure<T>(string code, string message) => Failure<T>(new AppError(code, message));
+
+    /// <summary>نتیجه‌ی موفق دارای مقدار. نوع <typeparamref name="T"/> از آرگومان استنتاج می‌شود.</summary>
+    public static Result<T> Success<T>(T value) => new(isSuccess: true, value, AppError.None);
 }
 
 /// <summary>
@@ -47,6 +50,14 @@ public sealed class Result<T> : Result
     {
         Value = value;
     }
+
+    /// <summary>
+    /// مقدار در صورت موفقیت؛ در صورت ناموفق بودن <see cref="Result"/> استثنا پرتاب می‌کند.
+    /// این متد فقط بعد از بررسی <see cref="Result.IsFailure"/> در کنترلرها استفاده می‌شود
+    /// تا کامپایلر بداند مقدار null نیست.
+    /// </summary>
+    public T GetValueOrThrow() =>
+        IsSuccess ? Value! : throw new InvalidOperationException($"Cannot access value of a failed result: {Error.Code}");
 
     /// <summary>تبدیل مقدار در صورت موفقیت؛ در غیر این صورت خطا منتشر می‌شود.</summary>
     public Result<TOut> Map<TOut>(Func<T, TOut> mapper) =>

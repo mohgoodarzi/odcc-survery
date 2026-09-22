@@ -1,6 +1,9 @@
+using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using ODCC.Application.Modules.Audit.Abstractions;
 using ODCC.Application.Modules.Audit.Services;
+using ODCC.Application.Modules.Identity.Dtos;
+using ODCC.Application.Modules.Organization.Dtos;
 
 namespace ODCC.Application;
 
@@ -13,6 +16,12 @@ public static class DependencyInjection
     {
         // ماژول ممیزی: به‌عنوان ماژول مرجع پیاده‌سازی شده است.
         services.AddScoped<IAuditService, AuditService>();
+
+        // اعتبارسنجی‌های FluentValidation با پیام‌های فارسی.
+        // اسامی به‌صورت صریح ثبت می‌شوند تا پیکربندی خودکار نیازی به
+        // اسکن اسمبلی (که در زمان شروع برنامه هزینه دارد) نداشته باشد.
+        services.AddValidatorsFromAssemblyContaining<LoginRequestValidator>();
+        services.AddValidatorsFromAssemblyContaining<SaveOrgUnitRequestValidator>();
 
         return services;
     }

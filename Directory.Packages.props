@@ -33,6 +33,10 @@
     <!-- گزارش‌گیری PDF با پشتیبانی کامل از فارسی و RTL -->
     <PackageVersion Include="QuestPDF" Version="2025.1.3" />
 
+    <!-- اعتبارسنجی با پیام‌های فارسی -->
+    <PackageVersion Include="FluentValidation" Version="12.0.0" />
+    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.0.0" />
+
     <!-- آزمون‌ها -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
     <PackageVersion Include="xunit" Version="2.9.3" />
@@ -41,6 +45,9 @@
     <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />
     <PackageVersion Include="Testcontainers.MsSql" Version="4.4.0" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+
+    <!-- پایگاه‌داده‌ی درون‌حافظه‌ای مخصوص آزمون (هرگز پایگاه‌داده‌ی واقعی را لمس نمی‌کند) -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="$(EntityFrameworkCoreVersion)" />
   </ItemGroup>
 
 </Project>
