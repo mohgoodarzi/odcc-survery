@@ -11,6 +11,8 @@ using ODCC.Domain.Common;
 using ODCC.Domain.Modules.Organization.Enums;
 using ODCC.Application.Modules.Audit.Abstractions;
 using ODCC.Application.Modules.Audit.Services;
+using ODCC.Application.Modules.QuestionBank.Abstractions;
+using ODCC.Application.Modules.Questionnaire.Abstractions;
 using ODCC.Infrastructure.Modules.Audit.EventListeners;
 using ODCC.Infrastructure.Repositories.Audit;
 using ODCC.Infrastructure.Modules.Identity;
@@ -18,6 +20,14 @@ using ODCC.Infrastructure.Modules.Identity.Entities;
 using ODCC.Infrastructure.Modules.Identity.Persistence;
 using ODCC.Infrastructure.Modules.Identity.Repositories;
 using ODCC.Infrastructure.Modules.Identity.Services;
+using ODCC.Infrastructure.Modules.QuestionBank.EventListeners;
+using ODCC.Infrastructure.Modules.QuestionBank.Persistence;
+using ODCC.Infrastructure.Modules.QuestionBank.Repositories;
+using ODCC.Infrastructure.Modules.QuestionBank.Services;
+using ODCC.Infrastructure.Modules.Questionnaire.EventListeners;
+using ODCC.Infrastructure.Modules.Questionnaire.Persistence;
+using ODCC.Infrastructure.Modules.Questionnaire.Repositories;
+using ODCC.Infrastructure.Modules.Questionnaire.Services;
 using ODCC.Infrastructure.Modules.Organization.Persistence;
 using ODCC.Infrastructure.Modules.Organization.Repositories;
 using ODCC.Infrastructure.Modules.Organization.Services;
@@ -41,25 +51,37 @@ public sealed class TestEnvironment : IAsyncDisposable
     public IServiceProvider Services { get; }
     public IdentityDbContext IdentityDbContext { get; }
     public OrganizationDbContext OrganizationDbContext { get; }
+    public QuestionBankDbContext QuestionBankDbContext { get; }
+    public QuestionnaireDbContext QuestionnaireDbContext { get; }
 
     private readonly SqliteConnection _identityConnection;
     private readonly SqliteConnection _organizationConnection;
     private readonly SqliteConnection _auditConnection;
+    private readonly SqliteConnection _questionBankConnection;
+    private readonly SqliteConnection _questionnaireConnection;
 
     private TestEnvironment(
         IServiceProvider services,
         IdentityDbContext identityDbContext,
         OrganizationDbContext organizationDbContext,
+        QuestionBankDbContext questionBankDbContext,
+        QuestionnaireDbContext questionnaireDbContext,
         SqliteConnection identityConnection,
         SqliteConnection organizationConnection,
-        SqliteConnection auditConnection)
+        SqliteConnection auditConnection,
+        SqliteConnection questionBankConnection,
+        SqliteConnection questionnaireConnection)
     {
         Services = services;
         IdentityDbContext = identityDbContext;
         OrganizationDbContext = organizationDbContext;
+        QuestionBankDbContext = questionBankDbContext;
+        QuestionnaireDbContext = questionnaireDbContext;
         _identityConnection = identityConnection;
         _organizationConnection = organizationConnection;
         _auditConnection = auditConnection;
+        _questionBankConnection = questionBankConnection;
+        _questionnaireConnection = questionnaireConnection;
     }
 
     /// <summary>
@@ -77,6 +99,12 @@ public sealed class TestEnvironment : IAsyncDisposable
         var auditConnection = new SqliteConnection("DataSource=:memory:");
         await auditConnection.OpenAsync();
 
+        var questionBankConnection = new SqliteConnection("DataSource=:memory:");
+        await questionBankConnection.OpenAsync();
+
+        var questionnaireConnection = new SqliteConnection("DataSource=:memory:");
+        await questionnaireConnection.OpenAsync();
+
         var services = new ServiceCollection();
 
         services.AddLogging();
@@ -90,6 +118,12 @@ public sealed class TestEnvironment : IAsyncDisposable
 
         services.AddDbContext<AuditDbContext>(options =>
             options.UseSqlite(auditConnection));
+
+        services.AddDbContext<QuestionBankDbContext>(options =>
+            options.UseSqlite(questionBankConnection));
+
+        services.AddDbContext<QuestionnaireDbContext>(options =>
+            options.UseSqlite(questionnaireConnection));
 
         services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
             {
@@ -124,16 +158,27 @@ public sealed class TestEnvironment : IAsyncDisposable
         services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Organization.Events.OrgUnitCreatedEvent>, OrganizationAuditEventListener>();
         services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Organization.Events.OrgUnitUpdatedEvent>, OrganizationAuditEventListener>();
         services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Organization.Events.OrgUnitDeletedEvent>, OrganizationAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.QuestionBank.Events.QuestionCreatedEvent>, QuestionBankAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.QuestionBank.Events.QuestionUpdatedEvent>, QuestionBankAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.QuestionBank.Events.QuestionArchivedEvent>, QuestionBankAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Questionnaire.Events.QuestionnaireCreatedEvent>, QuestionnaireAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Questionnaire.Events.QuestionnaireUpdatedEvent>, QuestionnaireAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Questionnaire.Events.QuestionnairePublishedEvent>, QuestionnaireAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Questionnaire.Events.QuestionnaireArchivedEvent>, QuestionnaireAuditEventListener>();
         services.AddScoped<IAuditEntryRepository, AuditEntryRepository>();
         services.AddScoped<IAuditService, AuditService>();
         services.AddScoped<IRefreshTokenStore, RefreshTokenStore>();
         services.AddScoped<IUserLookupService, UserLookupService>();
         services.AddScoped<IIdentityUnitOfWork, IdentityUnitOfWork>();
         services.AddScoped<IOrganizationUnitOfWork, OrganizationUnitOfWork>();
+        services.AddScoped<IQuestionBankUnitOfWork, QuestionBankUnitOfWork>();
+        services.AddScoped<IQuestionnaireUnitOfWork, QuestionnaireUnitOfWork>();
 
         services.AddScoped<IOrgUnitRepository, OrgUnitRepository>();
         services.AddScoped<IPositionRepository, PositionRepository>();
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
+        services.AddScoped<IQuestionRepository, QuestionRepository>();
+        services.AddScoped<IQuestionnaireRepository, QuestionnaireRepository>();
 
         services.AddScoped<IOrgUnitService, OrgUnitService>();
         services.AddScoped<IPositionService, PositionService>();
@@ -141,6 +186,8 @@ public sealed class TestEnvironment : IAsyncDisposable
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IQuestionService, QuestionService>();
+        services.AddScoped<IQuestionnaireService, QuestionnaireService>();
 
         // داده‌ی اولیه (bootstrap). رمز عبور آزمون هرگز در production نیست.
         services.AddSingleton(Options.Create(new SeedOptions
@@ -161,13 +208,19 @@ public sealed class TestEnvironment : IAsyncDisposable
         var identityDbContext = provider.GetRequiredService<IdentityDbContext>();
         var organizationDbContext = provider.GetRequiredService<OrganizationDbContext>();
         var auditDbContext = provider.GetRequiredService<AuditDbContext>();
+        var questionBankDbContext = provider.GetRequiredService<QuestionBankDbContext>();
+        var questionnaireDbContext = provider.GetRequiredService<QuestionnaireDbContext>();
 
         await identityDbContext.Database.EnsureCreatedAsync();
         await organizationDbContext.Database.EnsureCreatedAsync();
         await auditDbContext.Database.EnsureCreatedAsync();
+        await questionBankDbContext.Database.EnsureCreatedAsync();
+        await questionnaireDbContext.Database.EnsureCreatedAsync();
 
         return new TestEnvironment(provider, identityDbContext, organizationDbContext,
-            identityConnection, organizationConnection, auditConnection);
+            questionBankDbContext, questionnaireDbContext,
+            identityConnection, organizationConnection, auditConnection,
+            questionBankConnection, questionnaireConnection);
     }
 
     /// <summary>
@@ -226,9 +279,13 @@ public sealed class TestEnvironment : IAsyncDisposable
     {
         await IdentityDbContext.DisposeAsync();
         await OrganizationDbContext.DisposeAsync();
+        await QuestionBankDbContext.DisposeAsync();
+        await QuestionnaireDbContext.DisposeAsync();
         await _identityConnection.DisposeAsync();
         await _organizationConnection.DisposeAsync();
         await _auditConnection.DisposeAsync();
+        await _questionBankConnection.DisposeAsync();
+        await _questionnaireConnection.DisposeAsync();
         if (Services is IDisposable disposable)
         {
             disposable.Dispose();

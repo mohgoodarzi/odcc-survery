@@ -10,6 +10,8 @@ using ODCC.Application.Authorization;
 using ODCC.Application.Modules.Audit.Abstractions;
 using ODCC.Application.Modules.Identity.Abstractions;
 using ODCC.Application.Modules.Organization.Abstractions;
+using ODCC.Application.Modules.QuestionBank.Abstractions;
+using ODCC.Application.Modules.Questionnaire.Abstractions;
 using ODCC.Infrastructure.Modules.Audit.EventListeners;
 using ODCC.Infrastructure.Modules.Identity;
 using ODCC.Infrastructure.Modules.Identity.Entities;
@@ -19,6 +21,14 @@ using ODCC.Infrastructure.Modules.Identity.Services;
 using ODCC.Infrastructure.Modules.Organization.Persistence;
 using ODCC.Infrastructure.Modules.Organization.Repositories;
 using ODCC.Infrastructure.Modules.Organization.Services;
+using ODCC.Infrastructure.Modules.QuestionBank.EventListeners;
+using ODCC.Infrastructure.Modules.QuestionBank.Persistence;
+using ODCC.Infrastructure.Modules.QuestionBank.Repositories;
+using ODCC.Infrastructure.Modules.QuestionBank.Services;
+using ODCC.Infrastructure.Modules.Questionnaire.EventListeners;
+using ODCC.Infrastructure.Modules.Questionnaire.Persistence;
+using ODCC.Infrastructure.Modules.Questionnaire.Repositories;
+using ODCC.Infrastructure.Modules.Questionnaire.Services;
 using ODCC.Infrastructure.Persistence;
 using ODCC.Infrastructure.Persistence.Audit;
 using ODCC.Infrastructure.Repositories.Audit;
@@ -61,9 +71,22 @@ public static class DependencyInjection
         services.AddScoped<IDomainEventListener<Domain.Modules.Organization.Events.OrgUnitUpdatedEvent>, OrganizationAuditEventListener>();
         services.AddScoped<IDomainEventListener<Domain.Modules.Organization.Events.OrgUnitDeletedEvent>, OrganizationAuditEventListener>();
 
+        // شنونده‌ی رویدادهای ماژول کتابخانه‌ی سؤالات.
+        services.AddScoped<IDomainEventListener<Domain.Modules.QuestionBank.Events.QuestionCreatedEvent>, QuestionBankAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.QuestionBank.Events.QuestionUpdatedEvent>, QuestionBankAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.QuestionBank.Events.QuestionArchivedEvent>, QuestionBankAuditEventListener>();
+
+        // شنونده‌ی رویدادهای ماژول پرسشنامه‌ها.
+        services.AddScoped<IDomainEventListener<Domain.Modules.Questionnaire.Events.QuestionnaireCreatedEvent>, QuestionnaireAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Questionnaire.Events.QuestionnaireUpdatedEvent>, QuestionnaireAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Questionnaire.Events.QuestionnairePublishedEvent>, QuestionnaireAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Questionnaire.Events.QuestionnaireArchivedEvent>, QuestionnaireAuditEventListener>();
+
         ConfigureAudit(services, connectionString, configure);
         ConfigureIdentity(services, connectionString, configure);
         ConfigureOrganization(services, connectionString, configure);
+        ConfigureQuestionBank(services, connectionString, configure);
+        ConfigureQuestionnaire(services, connectionString, configure);
 
         return services;
     }
@@ -204,6 +227,42 @@ public static class DependencyInjection
         services.AddScoped<IPositionService, PositionService>();
         services.AddScoped<IEmployeeService, EmployeeService>();
         services.AddScoped<IOrganizationUnitOfWork, OrganizationUnitOfWork>();
+    }
+
+    // --- ماژول کتابخانه‌ی سؤالات -------------------------------------------
+
+    private static void ConfigureQuestionBank(
+        IServiceCollection services,
+        string connectionString,
+        Action<DbContextOptionsBuilder>? configure)
+    {
+        services.AddDbContext<QuestionBankDbContext>(options =>
+        {
+            ConfigureSql(options, connectionString);
+            configure?.Invoke(options);
+        });
+
+        services.AddScoped<IQuestionRepository, QuestionRepository>();
+        services.AddScoped<IQuestionService, QuestionService>();
+        services.AddScoped<IQuestionBankUnitOfWork, QuestionBankUnitOfWork>();
+    }
+
+    // --- ماژول پرسشنامه‌ها -------------------------------------------------
+
+    private static void ConfigureQuestionnaire(
+        IServiceCollection services,
+        string connectionString,
+        Action<DbContextOptionsBuilder>? configure)
+    {
+        services.AddDbContext<QuestionnaireDbContext>(options =>
+        {
+            ConfigureSql(options, connectionString);
+            configure?.Invoke(options);
+        });
+
+        services.AddScoped<IQuestionnaireRepository, QuestionnaireRepository>();
+        services.AddScoped<IQuestionnaireService, QuestionnaireService>();
+        services.AddScoped<IQuestionnaireUnitOfWork, QuestionnaireUnitOfWork>();
     }
 
     private static void ConfigureSql(DbContextOptionsBuilder options, string connectionString)

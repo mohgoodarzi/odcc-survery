@@ -22,6 +22,8 @@ using ODCC.Infrastructure.Modules.Identity;
 using ODCC.Infrastructure.Modules.Identity.Entities;
 using ODCC.Infrastructure.Modules.Identity.Persistence;
 using ODCC.Infrastructure.Modules.Organization.Persistence;
+using ODCC.Infrastructure.Modules.QuestionBank.Persistence;
+using ODCC.Infrastructure.Modules.Questionnaire.Persistence;
 using ODCC.Infrastructure.Persistence.Audit;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -142,7 +144,9 @@ builder.Services.AddHsts(options =>
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<AuditDbContext>("sql-server-audit")
     .AddDbContextCheck<IdentityDbContext>("sql-server-identity")
-    .AddDbContextCheck<OrganizationDbContext>("sql-server-organization");
+    .AddDbContextCheck<OrganizationDbContext>("sql-server-organization")
+    .AddDbContextCheck<QuestionBankDbContext>("sql-server-question-bank")
+    .AddDbContextCheck<QuestionnaireDbContext>("sql-server-questionnaire");
 
 var app = builder.Build();
 

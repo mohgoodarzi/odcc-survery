@@ -4,6 +4,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ODCC.Infrastructure.Modules.Identity.Persistence;
 using ODCC.Infrastructure.Modules.Organization.Persistence;
+using ODCC.Infrastructure.Modules.QuestionBank.Persistence;
+using ODCC.Infrastructure.Modules.Questionnaire.Persistence;
 using ODCC.Infrastructure.Persistence.Audit;
 
 namespace ODCC.Infrastructure.Persistence;
@@ -49,6 +51,8 @@ public sealed class OdccDbInitializerHostedService(
             await MigrateContextAsync<AuditDbContext>(provider, cancellationToken);
             await MigrateContextAsync<IdentityDbContext>(provider, cancellationToken);
             await MigrateContextAsync<OrganizationDbContext>(provider, cancellationToken);
+            await MigrateContextAsync<QuestionBankDbContext>(provider, cancellationToken);
+            await MigrateContextAsync<QuestionnaireDbContext>(provider, cancellationToken);
         }
         catch (Exception ex)
         {

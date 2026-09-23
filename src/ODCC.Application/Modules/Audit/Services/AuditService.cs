@@ -5,6 +5,11 @@ namespace ODCC.Application.Modules.Audit.Services;
 
 /// <summary>
 /// پیاده‌سازی پیش‌فرض سرویس ممیزی.
+///
+/// <b>ذخیره‌سازی:</b> ماژول ممیزی <c>AuditDbContext</c> اختصاصی خود را دارد که
+/// با DbContext ماژول‌های دیگر مشترک نیست، بنابراین رویدادهای ممیزی باید در
+/// همان فراخوانی ذخیره شوند؛ در غیر این صورت، آن‌ها در پایان درخواست گم
+/// می‌شوند (UnitOfWork ماژول مبدأ فقط تغییرات DbContext خودش را commit می‌کند).
 /// </summary>
 public sealed class AuditService(IAuditEntryRepository repository) : IAuditService
 {
@@ -26,6 +31,7 @@ public sealed class AuditService(IAuditEntryRepository repository) : IAuditServi
         };
 
         await _repository.AddAsync(entity, ct);
+        await _repository.SaveChangesAsync(ct);
     }
 
     public async Task<IReadOnlyList<AuditEntryDto>> SearchAsync(AuditSearchRequest request, CancellationToken ct = default)

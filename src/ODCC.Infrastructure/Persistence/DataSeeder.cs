@@ -60,6 +60,11 @@ public sealed class DataSeeder(
         var rootOrgUnitId = await SeedRootOrgUnitAsync(ct);
         await SeedAdminRoleAsync(ct);
         await SeedAdminUserAsync(rootOrgUnitId, ct);
+
+        // مجوزهای جدید (مثلاً مجوزهای فاز بعدی) به نقش مدیر کل موجود اضافه می‌شوند.
+        // این گام فقط اضافه می‌کند و هرگز مجوزهای موجود را حذف نمی‌کند، بنابراین
+        // برای پایگاه‌داده‌های قبلی هم امن است.
+        await SyncAdminPermissionsAsync(ct);
     }
 
     /// <summary>
@@ -142,6 +147,43 @@ public sealed class DataSeeder(
         catch (Exception ex)
         {
             SeedFailed(logger, nameof(SeedAdminRoleAsync), ex);
+        }
+    }
+
+    /// <summary>
+    /// افزودن مجوزهای جدید به نقش مدیر کل موجود. این متد فقط در زمانی اجرا
+    /// می‌شود که نقش از قبل ایجاد شده باشد (داده‌ی قبلی)، تا مجوزهای فازهای جدید
+    /// بدون نیاز به بازسازی پایگاه‌داده به نقش سیستمی برسند.
+    /// </summary>
+    private async Task SyncAdminPermissionsAsync(CancellationToken ct)
+    {
+        try
+        {
+            var role = await roleManager.FindByNameAsync(_options.AdminRoleName);
+            if (role is null)
+            {
+                return;
+            }
+
+            // فقط مجوزهای تعریف‌شده‌ای که هنوز روی این نقش نیستند.
+            var existing = await roleManager.GetClaimsAsync(role);
+            var missing = Permissions.All
+                .Where(p => !existing.Any(c => c.Type == Permissions.ClaimType && c.Value == p))
+                .ToList();
+
+            if (missing.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var permission in missing)
+            {
+                await roleManager.AddClaimAsync(role, new Claim(Permissions.ClaimType, permission));
+            }
+        }
+        catch (Exception ex)
+        {
+            SeedFailed(logger, nameof(SyncAdminPermissionsAsync), ex);
         }
     }
 

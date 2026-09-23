@@ -13,6 +13,8 @@ public class AuditEntryRepository(AuditDbContext context) : Repository<AuditEntr
 {
     private readonly AuditDbContext _context = context;
 
+    public Task<int> SaveChangesAsync(CancellationToken ct = default) => _context.SaveChangesAsync(ct);
+
     public async Task<IReadOnlyList<AuditEntry>> SearchAsync(AuditSearchRequest request, CancellationToken ct = default)
     {
         // فیلتر حذف نرم به‌وسیله‌ی QueryFilter سراسری اعمال می‌شود.

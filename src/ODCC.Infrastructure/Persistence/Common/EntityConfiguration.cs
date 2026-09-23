@@ -27,11 +27,19 @@ public static class EntityConfiguration
         builder.HasQueryFilter(e => !e.IsDeleted); // حذف نرم: فیلتر سراسری روی تمام پرس‌وجوها
 
         // کنترل همزمانی خوش‌بینانه.
-        // در SQL Server نوع rowversion توسط خود موتور پایگاه داده تولید می‌شود.
-        // SQLite قادر به تولید آن نیست (rowversion در SQLite فقط نام مستعاری برای
-        // کلید اصلی است)، بنابراین در SQLite نسخه‌ی ردیف به‌صورت یک مقدار پیش‌فرض
-        // تولید می‌شود تا قانون NOT NULL نقض نشود. این فقط در محیط آزمون
-        // (SQLite درون‌حافظه‌ای) رخ می‌دهد و رفتار تولید را تغییر نمی‌دهد.
+        //
+        // در SQL Server نوع rowversion توسط خود موتور پایگاه داده تولید و در هر
+        // به‌روزرسانی تغییر می‌کند، بنابراین مقایسه‌ی مقدار اصلی بارگذاری‌شده با
+        // مقدار ذخیره‌شده همواره برقرار می‌ماند.
+        //
+        // SQLite قادر به تولید یا به‌روزرسانی rowversion نیست (در SQLite این نوع فقط
+        // نام مستعاری برای کلید اصلی است). اگر در SQLite از IsRowVersion() استفاده
+        // شود، EF Core در به‌روزرسانیِ موجودیتی که فرزند جدیدی دریافت کرده، یک
+        // بلاب خالی را به‌عنوان توکن اصلی می‌فرستد و چون آن ردیف در دیتابیس مقدار
+        // متفاوتی دارد، DbUpdateConcurrencyException پرتاب می‌شود. بنابراین در
+        // SQLite این ستون یک مقدار پیش‌فرض تصادفی می‌گیرد اما توکن همزمانی
+        // محسوب نمی‌شود. این فقط در محیط آزمون (SQLite درون‌حافظه‌ای) رخ می‌دهد
+        // و رفتار تولید (SQL Server) را تغییر نمی‌دهد.
         if (string.Equals(databaseProvider, "Microsoft.EntityFrameworkCore.Sqlite", StringComparison.Ordinal))
         {
             builder.Property(e => e.RowVersion).HasDefaultValueSql("randomblob(8)");

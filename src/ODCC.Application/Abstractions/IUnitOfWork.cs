@@ -24,6 +24,16 @@ public interface IIdentityUnitOfWork : IUnitOfWork;
 public interface IOrganizationUnitOfWork : IUnitOfWork;
 
 /// <summary>
+/// مرز تراکنشی ماژول کتابخانه‌ی سؤالات. فقط این ماژول باید آن را تزریق بگیرد.
+/// </summary>
+public interface IQuestionBankUnitOfWork : IUnitOfWork;
+
+/// <summary>
+/// مرز تراکنشی ماژول پرسشنامه‌ها. فقط این ماژول باید آن را تزریق بگیرد.
+/// </summary>
+public interface IQuestionnaireUnitOfWork : IUnitOfWork;
+
+/// <summary>
 /// مشخصه‌ی پرس‌وجوی قابل‌استفاده مجدد: فیلتر، مرتب‌سازی و بارگذاری ناوبری.
 /// </summary>
 public interface ISpecification<T> where T : BaseEntity

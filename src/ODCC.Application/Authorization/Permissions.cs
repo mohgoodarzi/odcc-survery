@@ -55,6 +55,30 @@ public static class Permissions
         public const string EmployeesManage = "organization.employees.manage";
     }
 
+    /// <summary>مجوزهای کتابخانه‌ی سؤالات.</summary>
+    public static class QuestionBank
+    {
+        public const string Group = "question_bank";
+
+        /// <summary>مشاهده‌ی کتابخانه‌ی سؤالات.</summary>
+        public const string View = "question_bank.view";
+
+        /// <summary>ایجاد، ویرایش و بایگانی سؤال‌ها.</summary>
+        public const string Manage = "question_bank.manage";
+    }
+
+    /// <summary>مجوزهای پرسشنامه‌ها.</summary>
+    public static class Questionnaire
+    {
+        public const string Group = "questionnaire";
+
+        /// <summary>مشاهده‌ی پرسشنامه‌ها.</summary>
+        public const string View = "questionnaire.view";
+
+        /// <summary>ایجاد، ویرایش، انتشار و بایگانی پرسشنامه‌ها.</summary>
+        public const string Manage = "questionnaire.manage";
+    }
+
     /// <summary>مجوزهای نظرسنجی (برای فازهای بعدی).</summary>
     public static class Survey
     {
@@ -110,6 +134,8 @@ public static class Permissions
         Organization.UnitsView, Organization.UnitsManage,
         Organization.PositionsView, Organization.PositionsManage,
         Organization.EmployeesView, Organization.EmployeesManage,
+        QuestionBank.View, QuestionBank.Manage,
+        Questionnaire.View, Questionnaire.Manage,
         Survey.View, Survey.Create, Survey.Edit, Survey.Publish, Survey.Delete,
         Campaign.View, Campaign.Manage,
         Response.View, Response.Export,

@@ -58,6 +58,18 @@ public static class PermissionCatalog
         },
         new()
         {
+            GroupKey = nameof(Permissions.QuestionBank),
+            DisplayName = "کتابخانه‌ی سؤالات",
+            Permissions = [Permissions.QuestionBank.View, Permissions.QuestionBank.Manage]
+        },
+        new()
+        {
+            GroupKey = nameof(Permissions.Questionnaire),
+            DisplayName = "پرسشنامه‌ها",
+            Permissions = [Permissions.Questionnaire.View, Permissions.Questionnaire.Manage]
+        },
+        new()
+        {
             GroupKey = nameof(Permissions.Survey),
             DisplayName = "نظرسنجی‌ها",
             Permissions = [
