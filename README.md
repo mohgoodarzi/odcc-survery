@@ -55,10 +55,26 @@ dotnet ef migrations add InitialCreate -p src/ODCC.Infrastructure -s src/ODCC.Ap
 # ماژول سازمان (واحدها، موقعیت‌ها، کارمندان)
 dotnet ef migrations add InitialCreate -p src/ODCC.Infrastructure -s src/ODCC.Api -c OrganizationDbContext -o Modules/Organization/Persistence/Migrations
 
+# ماژول کتابخانه‌ی سؤالات
+dotnet ef migrations add InitialCreate -p src/ODCC.Infrastructure -s src/ODCC.Api -c QuestionBankDbContext -o Modules/QuestionBank/Persistence/Migrations
+
+# ماژول پرسشنامه‌ها (بخش‌ها، آیتم‌ها، انشعاب)
+dotnet ef migrations add InitialCreate -p src/ODCC.Infrastructure -s src/ODCC.Api -c QuestionnaireDbContext -o Modules/Questionnaire/Persistence/Migrations
+
+# ماژول نظرسنجی‌ها (چرخه‌ی عمر، قالب‌ها)
+dotnet ef migrations add InitialCreate -p src/ODCC.Infrastructure -s src/ODCC.Api -c SurveyDbContext -o Modules/Survey/Persistence/Migrations
+
+# ماژول کمپین‌ها (زمان‌بندی، توزیع، یادآورها)
+dotnet ef migrations add InitialCreate -p src/ODCC.Infrastructure -s src/ODCC.Api -c CampaignDbContext -o Modules/Campaign/Persistence/Migrations
+
 # اعمال همه‌ی مهاجرت‌ها (پس از تأیید)
 dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c AuditDbContext
 dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c IdentityDbContext
 dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c OrganizationDbContext
+dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c QuestionBankDbContext
+dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c QuestionnaireDbContext
+dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c SurveyDbContext
+dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c CampaignDbContext
 ```
 
 > **هیچ‌کدام از این دستورات را تا دریافت تأیید اجرا نکنید.**
@@ -132,11 +148,14 @@ dotnet publish src/ODCC.Api -c Release -o ./publish
 
 ## وضعیت پروژه
 
-**فاز ۰ (زیرساخت و مبنا)** و **فاز ۱ (هویت، مجوزدهی و سازمان)** پیاده‌سازی شده‌اند.
+**فاز ۰** (زیرساخت و مبنا)، **فاز ۱** (هویت، مجوزدهی و سازمان)، **فاز ۲**
+(کتابخانه‌ی سؤالات و پرسشنامه) و **فاز ۳** (نظرسنجی و کمپین) پیاده‌سازی شده‌اند.
 ماژول‌های پیاده‌سازی‌شده تاکنون: Audit (ماژول مرجع)، Identity (کاربران، نقش‌ها،
-JWT، توکن‌های تازه‌سازی) و Organization (واحدهای سازمانی، موقعیت‌ها، کارمندان).
-سایر ماژول‌ها در فازهای بعدی ساخته می‌شوند. به جدول فازها در پروژه‌ی معماری
-مراجعه کنید.
+JWT، توکن‌های تازه‌سازی)، Organization (واحدهای سازمانی، موقعیت‌ها، کارمندان)،
+QuestionBank (سؤالات قابل‌استفاده‌ی مجدد، نسخه‌گذاری)، Questionnaire (بخش‌ها،
+آیتم‌ها، انشعاب)، Survey (چرخه‌ی عمر نظرسنجی، قالب‌ها، پرچم ناشناس) و Campaign
+(زمان‌بندی، جمعیت هدف، توزیع، یادآوری). سایر ماژول‌ها در فازهای بعدی ساخته
+می‌شوند. به جدول فازها در پروژه‌ی معماری مراجعه کنید.
 
 ## عیب‌یابی
 

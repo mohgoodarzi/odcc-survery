@@ -13,6 +13,9 @@ import { RolesPage } from '@/routes/identity/RolesPage';
 import { OrgUnitsPage } from '@/routes/organization/OrgUnitsPage';
 import { PositionsPage } from '@/routes/organization/PositionsPage';
 import { EmployeesPage } from '@/routes/organization/EmployeesPage';
+import { SurveysPage } from '@/routes/survey/SurveysPage';
+import { SurveyTemplatesPage } from '@/routes/survey/SurveyTemplatesPage';
+import { CampaignsPage } from '@/routes/campaign/CampaignsPage';
 
 /**
  * مسیرها با پیشوند فرهنگ هستند: /fa/dashboard , /en/surveys ...
@@ -77,6 +80,34 @@ export function AppRoutes() {
         }
       />
 
+      {/* نظرسنجی‌ها */}
+      <Route
+        path="/:culture/surveys"
+        element={
+          <RequireAuth permissions={[Permissions.Survey.View]}>
+            <SurveysPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/:culture/survey-templates"
+        element={
+          <RequireAuth permissions={[Permissions.Survey.View]}>
+            <SurveyTemplatesPage />
+          </RequireAuth>
+        }
+      />
+
+      {/* کمپین‌ها */}
+      <Route
+        path="/:culture/campaigns"
+        element={
+          <RequireAuth permissions={[Permissions.Campaign.View]}>
+            <CampaignsPage />
+          </RequireAuth>
+        }
+      />
+
       {/* سازمان */}
       <Route
         path="/:culture/organization/units"
@@ -85,8 +116,7 @@ export function AppRoutes() {
             <OrgUnitsPage />
           </RequireAuth>
         }
-      />
-      <Route
+      />      <Route
         path="/:culture/organization/positions"
         element={
           <RequireAuth permissions={[Permissions.Organization.PositionsView]}>

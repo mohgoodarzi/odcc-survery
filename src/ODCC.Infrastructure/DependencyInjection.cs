@@ -12,6 +12,8 @@ using ODCC.Application.Modules.Identity.Abstractions;
 using ODCC.Application.Modules.Organization.Abstractions;
 using ODCC.Application.Modules.QuestionBank.Abstractions;
 using ODCC.Application.Modules.Questionnaire.Abstractions;
+using ODCC.Application.Modules.Survey.Abstractions;
+using ODCC.Application.Modules.Campaign.Abstractions;
 using ODCC.Infrastructure.Modules.Audit.EventListeners;
 using ODCC.Infrastructure.Modules.Identity;
 using ODCC.Infrastructure.Modules.Identity.Entities;
@@ -29,6 +31,14 @@ using ODCC.Infrastructure.Modules.Questionnaire.EventListeners;
 using ODCC.Infrastructure.Modules.Questionnaire.Persistence;
 using ODCC.Infrastructure.Modules.Questionnaire.Repositories;
 using ODCC.Infrastructure.Modules.Questionnaire.Services;
+using ODCC.Infrastructure.Modules.Survey.EventListeners;
+using ODCC.Infrastructure.Modules.Survey.Persistence;
+using ODCC.Infrastructure.Modules.Survey.Repositories;
+using ODCC.Infrastructure.Modules.Survey.Services;
+using ODCC.Infrastructure.Modules.Campaign.EventListeners;
+using ODCC.Infrastructure.Modules.Campaign.Persistence;
+using ODCC.Infrastructure.Modules.Campaign.Repositories;
+using ODCC.Infrastructure.Modules.Campaign.Services;
 using ODCC.Infrastructure.Persistence;
 using ODCC.Infrastructure.Persistence.Audit;
 using ODCC.Infrastructure.Repositories.Audit;
@@ -82,11 +92,31 @@ public static class DependencyInjection
         services.AddScoped<IDomainEventListener<Domain.Modules.Questionnaire.Events.QuestionnairePublishedEvent>, QuestionnaireAuditEventListener>();
         services.AddScoped<IDomainEventListener<Domain.Modules.Questionnaire.Events.QuestionnaireArchivedEvent>, QuestionnaireAuditEventListener>();
 
+        // شنونده‌ی رویدادهای ماژول نظرسنجی‌ها.
+        services.AddScoped<IDomainEventListener<Domain.Modules.Survey.Events.SurveyCreatedEvent>, SurveyAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Survey.Events.SurveyUpdatedEvent>, SurveyAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Survey.Events.SurveyPublishedEvent>, SurveyAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Survey.Events.SurveyStartedEvent>, SurveyAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Survey.Events.SurveyClosedEvent>, SurveyAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Survey.Events.SurveyArchivedEvent>, SurveyAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Survey.Events.SurveyTemplateCreatedEvent>, SurveyAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Survey.Events.SurveyTemplateArchivedEvent>, SurveyAuditEventListener>();
+
+        // شنونده‌ی رویدادهای ماژول کمپین‌ها.
+        services.AddScoped<IDomainEventListener<Domain.Modules.Campaign.Events.CampaignCreatedEvent>, CampaignAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Campaign.Events.CampaignUpdatedEvent>, CampaignAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Campaign.Events.CampaignScheduledEvent>, CampaignAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Campaign.Events.CampaignLaunchedEvent>, CampaignAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Campaign.Events.CampaignCompletedEvent>, CampaignAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Campaign.Events.CampaignArchivedEvent>, CampaignAuditEventListener>();
+
         ConfigureAudit(services, connectionString, configure);
         ConfigureIdentity(services, connectionString, configure);
         ConfigureOrganization(services, connectionString, configure);
         ConfigureQuestionBank(services, connectionString, configure);
         ConfigureQuestionnaire(services, connectionString, configure);
+        ConfigureSurvey(services, connectionString, configure);
+        ConfigureCampaign(services, connectionString, configure);
 
         return services;
     }
@@ -263,6 +293,45 @@ public static class DependencyInjection
         services.AddScoped<IQuestionnaireRepository, QuestionnaireRepository>();
         services.AddScoped<IQuestionnaireService, QuestionnaireService>();
         services.AddScoped<IQuestionnaireUnitOfWork, QuestionnaireUnitOfWork>();
+    }
+
+    // --- ماژول نظرسنجی‌ها ---------------------------------------------------
+
+    private static void ConfigureSurvey(
+        IServiceCollection services,
+        string connectionString,
+        Action<DbContextOptionsBuilder>? configure)
+    {
+        services.AddDbContext<SurveyDbContext>(options =>
+        {
+            ConfigureSql(options, connectionString);
+            configure?.Invoke(options);
+        });
+
+        services.AddScoped<ISurveyRepository, SurveyRepository>();
+        services.AddScoped<ISurveyTemplateRepository, SurveyTemplateRepository>();
+        services.AddScoped<ISurveyService, SurveyService>();
+        services.AddScoped<ISurveyTemplateService, SurveyTemplateService>();
+        services.AddScoped<ISurveyUnitOfWork, SurveyUnitOfWork>();
+    }
+
+    // --- ماژول کمپین‌ها -----------------------------------------------------
+
+    private static void ConfigureCampaign(
+        IServiceCollection services,
+        string connectionString,
+        Action<DbContextOptionsBuilder>? configure)
+    {
+        services.AddDbContext<CampaignDbContext>(options =>
+        {
+            ConfigureSql(options, connectionString);
+            configure?.Invoke(options);
+        });
+
+        services.AddScoped<ICampaignRepository, CampaignRepository>();
+        services.AddScoped<IDistributionRepository, DistributionRepository>();
+        services.AddScoped<ICampaignService, CampaignService>();
+        services.AddScoped<ICampaignUnitOfWork, CampaignUnitOfWork>();
     }
 
     private static void ConfigureSql(DbContextOptionsBuilder options, string connectionString)

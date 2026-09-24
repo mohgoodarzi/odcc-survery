@@ -4,6 +4,8 @@ using ODCC.Infrastructure.Modules.Identity.Persistence;
 using ODCC.Infrastructure.Modules.Organization.Persistence;
 using ODCC.Infrastructure.Modules.QuestionBank.Persistence;
 using ODCC.Infrastructure.Modules.Questionnaire.Persistence;
+using ODCC.Infrastructure.Modules.Survey.Persistence;
+using ODCC.Infrastructure.Modules.Campaign.Persistence;
 using ODCC.Infrastructure.Persistence.Common;
 
 namespace ODCC.Infrastructure.Persistence;
@@ -121,3 +123,15 @@ public sealed class QuestionBankUnitOfWork(QuestionBankDbContext context, IDomai
 /// </summary>
 public sealed class QuestionnaireUnitOfWork(QuestionnaireDbContext context, IDomainEventDispatcher domainEventDispatcher)
     : UnitOfWork<QuestionnaireDbContext>(context, domainEventDispatcher), IQuestionnaireUnitOfWork;
+
+/// <summary>
+/// مرز تراکنشی ماژول نظرسنجی‌ها.
+/// </summary>
+public sealed class SurveyUnitOfWork(SurveyDbContext context, IDomainEventDispatcher domainEventDispatcher)
+    : UnitOfWork<SurveyDbContext>(context, domainEventDispatcher), ISurveyUnitOfWork;
+
+/// <summary>
+/// مرز تراکنشی ماژول کمپین‌ها.
+/// </summary>
+public sealed class CampaignUnitOfWork(CampaignDbContext context, IDomainEventDispatcher domainEventDispatcher)
+    : UnitOfWork<CampaignDbContext>(context, domainEventDispatcher), ICampaignUnitOfWork;

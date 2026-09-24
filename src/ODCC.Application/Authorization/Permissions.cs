@@ -79,7 +79,7 @@ public static class Permissions
         public const string Manage = "questionnaire.manage";
     }
 
-    /// <summary>مجوزهای نظرسنجی (برای فازهای بعدی).</summary>
+    /// <summary>مجوزهای نظرسنجی‌ها (چرخه‌ی عمر، تنظیمات و قالب‌ها).</summary>
     public static class Survey
     {
         public const string View = "surveys.view";

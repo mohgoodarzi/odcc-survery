@@ -1,4 +1,7 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <UserSecretsId>fb18b0a7-7856-48a2-99ea-8137f13c845f</UserSecretsId>
+  </PropertyGroup>
 
   <!--
     ریشه‌ی ترکیب (Composition Root):

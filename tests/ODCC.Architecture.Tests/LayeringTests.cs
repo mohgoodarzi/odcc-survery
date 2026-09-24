@@ -76,17 +76,26 @@ public class LayeringTests
 
     /// <summary>
     /// لایه‌ی کاربری نباید مستقیماً به موجودیت‌های داخلی ماژول‌های دیگر ارجاع دهد.
-    /// قراردادها در Abstractions مجاز هستند.
+    /// قراردادها در Abstractions مجاز هستند. این لیست تمام ماژول‌های پیاده‌سازی‌شده
+    /// را پوشش می‌دهد تا اضافه‌شدن ماژول جدید به‌صورت خودکار تحت نظر باشد.
     /// </summary>
     [Fact]
     public void Application_Should_Not_Reference_Infrastructure_Module_Internals()
     {
+        var moduleNamespaces = new[]
+        {
+            "ODCC.Infrastructure.Modules.Audit",
+            "ODCC.Infrastructure.Modules.Identity",
+            "ODCC.Infrastructure.Modules.Organization",
+            "ODCC.Infrastructure.Modules.QuestionBank",
+            "ODCC.Infrastructure.Modules.Questionnaire",
+            "ODCC.Infrastructure.Modules.Survey",
+            "ODCC.Infrastructure.Modules.Campaign"
+        };
+
         var result = Types.InAssembly(ApplicationAssembly)
             .Should()
-            .NotHaveDependencyOnAny(
-                "ODCC.Infrastructure.Modules.Identity.Entities",
-                "ODCC.Infrastructure.Modules.Identity.Persistence",
-                "ODCC.Infrastructure.Modules.Organization.Persistence")
+            .NotHaveDependencyOnAny(moduleNamespaces)
             .GetResult();
 
         result.IsSuccessful.Should().BeTrue(

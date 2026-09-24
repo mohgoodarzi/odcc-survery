@@ -6,6 +6,8 @@ using ODCC.Infrastructure.Modules.Identity.Persistence;
 using ODCC.Infrastructure.Modules.Organization.Persistence;
 using ODCC.Infrastructure.Modules.QuestionBank.Persistence;
 using ODCC.Infrastructure.Modules.Questionnaire.Persistence;
+using ODCC.Infrastructure.Modules.Survey.Persistence;
+using ODCC.Infrastructure.Modules.Campaign.Persistence;
 using ODCC.Infrastructure.Persistence.Audit;
 
 namespace ODCC.Infrastructure.Persistence;
@@ -53,6 +55,8 @@ public sealed class OdccDbInitializerHostedService(
             await MigrateContextAsync<OrganizationDbContext>(provider, cancellationToken);
             await MigrateContextAsync<QuestionBankDbContext>(provider, cancellationToken);
             await MigrateContextAsync<QuestionnaireDbContext>(provider, cancellationToken);
+            await MigrateContextAsync<SurveyDbContext>(provider, cancellationToken);
+            await MigrateContextAsync<CampaignDbContext>(provider, cancellationToken);
         }
         catch (Exception ex)
         {

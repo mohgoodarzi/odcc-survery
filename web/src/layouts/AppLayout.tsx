@@ -2,7 +2,8 @@ import { useRef, useState, type ReactNode } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, FileText, Megaphone, BarChart3, FileBarChart, Settings, Languages,
-  Users, ShieldCheck, Building2, Briefcase, UserCircle, LogOut, ChevronDown
+  Users, ShieldCheck, Building2, Briefcase, UserCircle, LogOut, ChevronDown,
+  LayoutTemplate
 } from 'lucide-react';
 
 import { useAuth } from '@/auth/AuthProvider';
@@ -34,8 +35,19 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
   const navItems: NavItem[] = [
     { to: `/${culture}/dashboard`, label: t.nav.dashboard, icon: LayoutDashboard },
-    { to: `/${culture}/surveys`, label: t.nav.surveys, icon: FileText },
-    { to: `/${culture}/campaigns`, label: t.nav.campaigns, icon: Megaphone },
+    {
+      to: `/${culture}/surveys`,
+      label: t.nav.surveys,
+      icon: FileText,
+      permissions: [Permissions.Survey.View]
+    },
+    {
+      to: `/${culture}/survey-templates`,
+      label: t.surveys.templatesTitle,
+      icon: LayoutTemplate,
+      permissions: [Permissions.Survey.View]
+    },
+    { to: `/${culture}/campaigns`, label: t.nav.campaigns, icon: Megaphone, permissions: [Permissions.Campaign.View] },
     { to: `/${culture}/analytics`, label: t.nav.analytics, icon: BarChart3 },
     { to: `/${culture}/reports`, label: t.nav.reports, icon: FileBarChart },
     {

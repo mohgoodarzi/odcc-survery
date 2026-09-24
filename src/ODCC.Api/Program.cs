@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using ODCC.Api.Authorization;
+using ODCC.Api.Filters;
 using ODCC.Api.Middleware;
 using ODCC.Api.Routing;
 using ODCC.Application;
@@ -24,6 +25,8 @@ using ODCC.Infrastructure.Modules.Identity.Persistence;
 using ODCC.Infrastructure.Modules.Organization.Persistence;
 using ODCC.Infrastructure.Modules.QuestionBank.Persistence;
 using ODCC.Infrastructure.Modules.Questionnaire.Persistence;
+using ODCC.Infrastructure.Modules.Survey.Persistence;
+using ODCC.Infrastructure.Modules.Campaign.Persistence;
 using ODCC.Infrastructure.Persistence.Audit;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -69,7 +72,9 @@ builder.Services.AddAuthorization();
 // ---- ارائه -----------------------------------------------------------------
 // AddControllersWithViews (نه AddControllers): فیلتر ValidateAntiforgeryTokenAuthorizationFilter
 // از طریق DI حل می‌شود و این فیلتر فقط توسط مجموعه‌ی کامل سرویس‌های MVC ثبت می‌شود.
-builder.Services.AddControllersWithViews();
+// ModelValidationFilter: اعتبارسنج‌های FluentValidation لایه‌ی کاربرد را روی
+// پارامترهای [FromBody] اجرا می‌کند تا درخواست نامعتبر هرگز به سرویس نرسد.
+builder.Services.AddControllersWithViews(options => options.Filters.Add<ModelValidationFilter>());
 
 // OpenAPI در .NET 10 داخلی است؛ نیازی به وابستگی Swashbuckle نیست.
 builder.Services.AddOpenApi();
@@ -146,7 +151,9 @@ builder.Services.AddHealthChecks()
     .AddDbContextCheck<IdentityDbContext>("sql-server-identity")
     .AddDbContextCheck<OrganizationDbContext>("sql-server-organization")
     .AddDbContextCheck<QuestionBankDbContext>("sql-server-question-bank")
-    .AddDbContextCheck<QuestionnaireDbContext>("sql-server-questionnaire");
+    .AddDbContextCheck<QuestionnaireDbContext>("sql-server-questionnaire")
+    .AddDbContextCheck<SurveyDbContext>("sql-server-survey")
+    .AddDbContextCheck<CampaignDbContext>("sql-server-campaign");
 
 var app = builder.Build();
 

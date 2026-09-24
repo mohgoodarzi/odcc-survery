@@ -25,6 +25,17 @@ export const Permissions = {
     PositionsManage: 'organization.positions.manage',
     EmployeesView: 'organization.employees.view',
     EmployeesManage: 'organization.employees.manage'
+  },
+  Survey: {
+    View: 'surveys.view',
+    Create: 'surveys.create',
+    Edit: 'surveys.edit',
+    Publish: 'surveys.publish',
+    Delete: 'surveys.delete'
+  },
+  Campaign: {
+    View: 'campaigns.view',
+    Manage: 'campaigns.manage'
   }
 } as const;
 

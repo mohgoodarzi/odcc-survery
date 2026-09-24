@@ -13,6 +13,8 @@ using ODCC.Application.Modules.Audit.Abstractions;
 using ODCC.Application.Modules.Audit.Services;
 using ODCC.Application.Modules.QuestionBank.Abstractions;
 using ODCC.Application.Modules.Questionnaire.Abstractions;
+using ODCC.Application.Modules.Survey.Abstractions;
+using ODCC.Application.Modules.Campaign.Abstractions;
 using ODCC.Infrastructure.Modules.Audit.EventListeners;
 using ODCC.Infrastructure.Repositories.Audit;
 using ODCC.Infrastructure.Modules.Identity;
@@ -28,6 +30,14 @@ using ODCC.Infrastructure.Modules.Questionnaire.EventListeners;
 using ODCC.Infrastructure.Modules.Questionnaire.Persistence;
 using ODCC.Infrastructure.Modules.Questionnaire.Repositories;
 using ODCC.Infrastructure.Modules.Questionnaire.Services;
+using ODCC.Infrastructure.Modules.Survey.EventListeners;
+using ODCC.Infrastructure.Modules.Survey.Persistence;
+using ODCC.Infrastructure.Modules.Survey.Repositories;
+using ODCC.Infrastructure.Modules.Survey.Services;
+using ODCC.Infrastructure.Modules.Campaign.EventListeners;
+using ODCC.Infrastructure.Modules.Campaign.Persistence;
+using ODCC.Infrastructure.Modules.Campaign.Repositories;
+using ODCC.Infrastructure.Modules.Campaign.Services;
 using ODCC.Infrastructure.Modules.Organization.Persistence;
 using ODCC.Infrastructure.Modules.Organization.Repositories;
 using ODCC.Infrastructure.Modules.Organization.Services;
@@ -53,12 +63,16 @@ public sealed class TestEnvironment : IAsyncDisposable
     public OrganizationDbContext OrganizationDbContext { get; }
     public QuestionBankDbContext QuestionBankDbContext { get; }
     public QuestionnaireDbContext QuestionnaireDbContext { get; }
+    public SurveyDbContext SurveyDbContext { get; }
+    public CampaignDbContext CampaignDbContext { get; }
 
     private readonly SqliteConnection _identityConnection;
     private readonly SqliteConnection _organizationConnection;
     private readonly SqliteConnection _auditConnection;
     private readonly SqliteConnection _questionBankConnection;
     private readonly SqliteConnection _questionnaireConnection;
+    private readonly SqliteConnection _surveyConnection;
+    private readonly SqliteConnection _campaignConnection;
 
     private TestEnvironment(
         IServiceProvider services,
@@ -66,22 +80,30 @@ public sealed class TestEnvironment : IAsyncDisposable
         OrganizationDbContext organizationDbContext,
         QuestionBankDbContext questionBankDbContext,
         QuestionnaireDbContext questionnaireDbContext,
+        SurveyDbContext surveyDbContext,
+        CampaignDbContext campaignDbContext,
         SqliteConnection identityConnection,
         SqliteConnection organizationConnection,
         SqliteConnection auditConnection,
         SqliteConnection questionBankConnection,
-        SqliteConnection questionnaireConnection)
+        SqliteConnection questionnaireConnection,
+        SqliteConnection surveyConnection,
+        SqliteConnection campaignConnection)
     {
         Services = services;
         IdentityDbContext = identityDbContext;
         OrganizationDbContext = organizationDbContext;
         QuestionBankDbContext = questionBankDbContext;
         QuestionnaireDbContext = questionnaireDbContext;
+        SurveyDbContext = surveyDbContext;
+        CampaignDbContext = campaignDbContext;
         _identityConnection = identityConnection;
         _organizationConnection = organizationConnection;
         _auditConnection = auditConnection;
         _questionBankConnection = questionBankConnection;
         _questionnaireConnection = questionnaireConnection;
+        _surveyConnection = surveyConnection;
+        _campaignConnection = campaignConnection;
     }
 
     /// <summary>
@@ -105,6 +127,12 @@ public sealed class TestEnvironment : IAsyncDisposable
         var questionnaireConnection = new SqliteConnection("DataSource=:memory:");
         await questionnaireConnection.OpenAsync();
 
+        var surveyConnection = new SqliteConnection("DataSource=:memory:");
+        await surveyConnection.OpenAsync();
+
+        var campaignConnection = new SqliteConnection("DataSource=:memory:");
+        await campaignConnection.OpenAsync();
+
         var services = new ServiceCollection();
 
         services.AddLogging();
@@ -124,6 +152,12 @@ public sealed class TestEnvironment : IAsyncDisposable
 
         services.AddDbContext<QuestionnaireDbContext>(options =>
             options.UseSqlite(questionnaireConnection));
+
+        services.AddDbContext<SurveyDbContext>(options =>
+            options.UseSqlite(surveyConnection));
+
+        services.AddDbContext<CampaignDbContext>(options =>
+            options.UseSqlite(campaignConnection));
 
         services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
             {
@@ -165,6 +199,20 @@ public sealed class TestEnvironment : IAsyncDisposable
         services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Questionnaire.Events.QuestionnaireUpdatedEvent>, QuestionnaireAuditEventListener>();
         services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Questionnaire.Events.QuestionnairePublishedEvent>, QuestionnaireAuditEventListener>();
         services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Questionnaire.Events.QuestionnaireArchivedEvent>, QuestionnaireAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Survey.Events.SurveyCreatedEvent>, SurveyAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Survey.Events.SurveyUpdatedEvent>, SurveyAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Survey.Events.SurveyPublishedEvent>, SurveyAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Survey.Events.SurveyStartedEvent>, SurveyAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Survey.Events.SurveyClosedEvent>, SurveyAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Survey.Events.SurveyArchivedEvent>, SurveyAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Survey.Events.SurveyTemplateCreatedEvent>, SurveyAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Survey.Events.SurveyTemplateArchivedEvent>, SurveyAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Campaign.Events.CampaignCreatedEvent>, CampaignAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Campaign.Events.CampaignUpdatedEvent>, CampaignAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Campaign.Events.CampaignScheduledEvent>, CampaignAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Campaign.Events.CampaignLaunchedEvent>, CampaignAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Campaign.Events.CampaignCompletedEvent>, CampaignAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Campaign.Events.CampaignArchivedEvent>, CampaignAuditEventListener>();
         services.AddScoped<IAuditEntryRepository, AuditEntryRepository>();
         services.AddScoped<IAuditService, AuditService>();
         services.AddScoped<IRefreshTokenStore, RefreshTokenStore>();
@@ -173,12 +221,18 @@ public sealed class TestEnvironment : IAsyncDisposable
         services.AddScoped<IOrganizationUnitOfWork, OrganizationUnitOfWork>();
         services.AddScoped<IQuestionBankUnitOfWork, QuestionBankUnitOfWork>();
         services.AddScoped<IQuestionnaireUnitOfWork, QuestionnaireUnitOfWork>();
+        services.AddScoped<ISurveyUnitOfWork, SurveyUnitOfWork>();
+        services.AddScoped<ICampaignUnitOfWork, CampaignUnitOfWork>();
 
         services.AddScoped<IOrgUnitRepository, OrgUnitRepository>();
         services.AddScoped<IPositionRepository, PositionRepository>();
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
         services.AddScoped<IQuestionRepository, QuestionRepository>();
         services.AddScoped<IQuestionnaireRepository, QuestionnaireRepository>();
+        services.AddScoped<ISurveyRepository, SurveyRepository>();
+        services.AddScoped<ISurveyTemplateRepository, SurveyTemplateRepository>();
+        services.AddScoped<ICampaignRepository, CampaignRepository>();
+        services.AddScoped<IDistributionRepository, DistributionRepository>();
 
         services.AddScoped<IOrgUnitService, OrgUnitService>();
         services.AddScoped<IPositionService, PositionService>();
@@ -188,6 +242,9 @@ public sealed class TestEnvironment : IAsyncDisposable
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IQuestionService, QuestionService>();
         services.AddScoped<IQuestionnaireService, QuestionnaireService>();
+        services.AddScoped<ISurveyService, SurveyService>();
+        services.AddScoped<ISurveyTemplateService, SurveyTemplateService>();
+        services.AddScoped<ICampaignService, CampaignService>();
 
         // داده‌ی اولیه (bootstrap). رمز عبور آزمون هرگز در production نیست.
         services.AddSingleton(Options.Create(new SeedOptions
@@ -210,17 +267,21 @@ public sealed class TestEnvironment : IAsyncDisposable
         var auditDbContext = provider.GetRequiredService<AuditDbContext>();
         var questionBankDbContext = provider.GetRequiredService<QuestionBankDbContext>();
         var questionnaireDbContext = provider.GetRequiredService<QuestionnaireDbContext>();
+        var surveyDbContext = provider.GetRequiredService<SurveyDbContext>();
+        var campaignDbContext = provider.GetRequiredService<CampaignDbContext>();
 
         await identityDbContext.Database.EnsureCreatedAsync();
         await organizationDbContext.Database.EnsureCreatedAsync();
         await auditDbContext.Database.EnsureCreatedAsync();
         await questionBankDbContext.Database.EnsureCreatedAsync();
         await questionnaireDbContext.Database.EnsureCreatedAsync();
+        await surveyDbContext.Database.EnsureCreatedAsync();
+        await campaignDbContext.Database.EnsureCreatedAsync();
 
         return new TestEnvironment(provider, identityDbContext, organizationDbContext,
-            questionBankDbContext, questionnaireDbContext,
+            questionBankDbContext, questionnaireDbContext, surveyDbContext, campaignDbContext,
             identityConnection, organizationConnection, auditConnection,
-            questionBankConnection, questionnaireConnection);
+            questionBankConnection, questionnaireConnection, surveyConnection, campaignConnection);
     }
 
     /// <summary>
@@ -260,6 +321,46 @@ public sealed class TestEnvironment : IAsyncDisposable
         return (company.Id, division.Id, department.Id, team.Id, otherDivision.Id, otherDepartment.Id);
     }
 
+    /// <summary>
+    /// ساخت کارمندان نمونه در واحدهای سازمانی داده‌شده (برای آزمون‌های جمعیت هدف کمپین).
+    /// وضعیت کارمندان چرخشی است: اولی «فعال»، دومی «مرخصی»، بقیه «ترک‌کار».
+    /// </summary>
+    /// <param name="unitEmployeeCounts">تعداد کارمند برای هر شناسه‌ی واحد.</param>
+    public async Task<List<ODCC.Domain.Modules.Organization.Entities.Employee>> SeedEmployeesAsync(
+        IReadOnlyDictionary<Guid, int> unitEmployeeCounts)
+    {
+        var employees = new List<ODCC.Domain.Modules.Organization.Entities.Employee>();
+        var counter = 0;
+
+        foreach (var (unitId, count) in unitEmployeeCounts)
+        {
+            for (var i = 0; i < count; i++)
+            {
+                counter++;
+                employees.Add(new ODCC.Domain.Modules.Organization.Entities.Employee
+                {
+                    EmployeeCode = $"EMP-{counter:D3}",
+                    FirstName = $"نام{counter}",
+                    LastName = $"خانوادگی{counter}",
+                    OrgUnitId = unitId,
+                    Status = i switch
+                    {
+                        0 => ODCC.Domain.Modules.Organization.Enums.EmployeeStatus.Active,
+                        1 => ODCC.Domain.Modules.Organization.Enums.EmployeeStatus.OnLeave,
+                        _ => ODCC.Domain.Modules.Organization.Enums.EmployeeStatus.Terminated
+                    },
+                    StartDate = new DateOnly(2020, 1, 1),
+                    WorkEmail = $"emp{counter}@test.local"
+                });
+            }
+        }
+
+        OrganizationDbContext.Employees.AddRange(employees);
+        await OrganizationDbContext.SaveChangesAsync();
+
+        return employees;
+    }
+
     private static ODCC.Domain.Modules.Organization.Entities.OrgUnit NewUnit(
         string code, string name, OrgUnitType type,
         ODCC.Domain.Modules.Organization.Entities.OrgUnit? parent)
@@ -281,11 +382,15 @@ public sealed class TestEnvironment : IAsyncDisposable
         await OrganizationDbContext.DisposeAsync();
         await QuestionBankDbContext.DisposeAsync();
         await QuestionnaireDbContext.DisposeAsync();
+        await SurveyDbContext.DisposeAsync();
+        await CampaignDbContext.DisposeAsync();
         await _identityConnection.DisposeAsync();
         await _organizationConnection.DisposeAsync();
         await _auditConnection.DisposeAsync();
         await _questionBankConnection.DisposeAsync();
         await _questionnaireConnection.DisposeAsync();
+        await _surveyConnection.DisposeAsync();
+        await _campaignConnection.DisposeAsync();
         if (Services is IDisposable disposable)
         {
             disposable.Dispose();

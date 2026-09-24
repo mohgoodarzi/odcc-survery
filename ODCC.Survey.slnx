@@ -6,6 +6,7 @@
     <Project Path="src/ODCC.Infrastructure/ODCC.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/ODCC.Api.Tests/ODCC.Api.Tests.csproj" />
     <Project Path="tests/ODCC.Architecture.Tests/ODCC.Architecture.Tests.csproj" />
     <Project Path="tests/ODCC.Application.Tests/ODCC.Application.Tests.csproj" />
     <Project Path="tests/ODCC.Infrastructure.Tests/ODCC.Infrastructure.Tests.csproj" />

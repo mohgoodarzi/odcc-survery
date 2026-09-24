@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    آزمون‌های لایه‌ی API: فیلترها، مرز اعتبارسنجی و رفتار کنترلرها.
+    این آزمون‌ها با ساخت ActionContext مستقل اجرا می‌شوند و نیازی به
+    پایگاه‌داده یا سرور واقعی ندارند.
+  -->
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <!-- روش نام‌گذاری آزمون‌های xUnit از زیرخط استفاده می‌کند. -->
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="coverlet.collector" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ODCC.Api\ODCC.Api.csproj" />
+  </ItemGroup>
+
+</Project>
