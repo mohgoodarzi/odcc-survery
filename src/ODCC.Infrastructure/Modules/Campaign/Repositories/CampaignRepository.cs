@@ -168,6 +168,38 @@ public sealed class DistributionRepository(CampaignDbContext dbContext) : IDistr
                         && (d.Status == DistributionStatus.Pending || d.Status == DistributionStatus.Sent))
             .ToListAsync(ct);
 
+    /// <summary>
+    /// دعوت‌نامه‌های باز یک کارمند (ارسال‌شده ولی هنوز پاسخ‌داده‌نشده) به‌همراه
+    /// کد و کانال کمپین. این متد فقط برای خواندن توسط ماژول پاسخ‌هاست و DTO
+    /// برمی‌گرداند تا مرز ماژول‌ها حفظ شود.
+    /// </summary>
+    public async Task<IReadOnlyList<OpenDistributionDto>> GetOpenByEmployeeAsync(Guid employeeId, CancellationToken ct = default)
+    {
+        var rows = await (
+            from distribution in _dbContext.Distributions.AsNoTracking()
+            join campaign in _dbContext.Campaigns.AsNoTracking() on distribution.CampaignId equals campaign.Id
+            where distribution.EmployeeId == employeeId && distribution.Status == DistributionStatus.Sent
+            select new
+            {
+                distribution.Id,
+                distribution.CampaignId,
+                CampaignCode = campaign.Code,
+                Channel = campaign.Channel,
+                campaign.SurveyId,
+                distribution.EmployeeId
+            }).ToListAsync(ct);
+
+        return rows.ConvertAll(r => new OpenDistributionDto
+        {
+            Id = r.Id,
+            CampaignId = r.CampaignId,
+            CampaignCode = r.CampaignCode,
+            Channel = r.Channel,
+            SurveyId = r.SurveyId,
+            EmployeeId = r.EmployeeId
+        });
+    }
+
     public void Update(Distribution distribution)
     {
         distribution.UpdatedAt = DateTime.UtcNow;

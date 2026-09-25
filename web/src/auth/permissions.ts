@@ -36,6 +36,10 @@ export const Permissions = {
   Campaign: {
     View: 'campaigns.view',
     Manage: 'campaigns.manage'
+  },
+  Response: {
+    View: 'responses.view',
+    Export: 'responses.export'
   }
 } as const;
 

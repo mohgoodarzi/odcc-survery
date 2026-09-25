@@ -67,6 +67,9 @@ dotnet ef migrations add InitialCreate -p src/ODCC.Infrastructure -s src/ODCC.Ap
 # ماژول کمپین‌ها (زمان‌بندی، توزیع، یادآورها)
 dotnet ef migrations add InitialCreate -p src/ODCC.Infrastructure -s src/ODCC.Api -c CampaignDbContext -o Modules/Campaign/Persistence/Migrations
 
+# ماژول پاسخ‌ها (نشست‌های پاسخ‌گویی، پاسخ‌ها، گزینه‌های انتخابی)
+dotnet ef migrations add InitialCreate -p src/ODCC.Infrastructure -s src/ODCC.Api -c ResponseDbContext -o Modules/Response/Persistence/Migrations
+
 # اعمال همه‌ی مهاجرت‌ها (پس از تأیید)
 dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c AuditDbContext
 dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c IdentityDbContext
@@ -75,6 +78,7 @@ dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c Question
 dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c QuestionnaireDbContext
 dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c SurveyDbContext
 dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c CampaignDbContext
+dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c ResponseDbContext
 ```
 
 > **هیچ‌کدام از این دستورات را تا دریافت تأیید اجرا نکنید.**
@@ -149,12 +153,14 @@ dotnet publish src/ODCC.Api -c Release -o ./publish
 ## وضعیت پروژه
 
 **فاز ۰** (زیرساخت و مبنا)، **فاز ۱** (هویت، مجوزدهی و سازمان)، **فاز ۲**
-(کتابخانه‌ی سؤالات و پرسشنامه) و **فاز ۳** (نظرسنجی و کمپین) پیاده‌سازی شده‌اند.
+(کتابخانه‌ی سؤالات و پرسشنامه)، **فاز ۳** (نظرسنجی و کمپین) و **فاز ۴**
+(مدیریت پاسخ) پیاده‌سازی شده‌اند.
 ماژول‌های پیاده‌سازی‌شده تاکنون: Audit (ماژول مرجع)، Identity (کاربران، نقش‌ها،
 JWT، توکن‌های تازه‌سازی)، Organization (واحدهای سازمانی، موقعیت‌ها، کارمندان)،
 QuestionBank (سؤالات قابل‌استفاده‌ی مجدد، نسخه‌گذاری)، Questionnaire (بخش‌ها،
-آیتم‌ها، انشعاب)، Survey (چرخه‌ی عمر نظرسنجی، قالب‌ها، پرچم ناشناس) و Campaign
-(زمان‌بندی، جمعیت هدف، توزیع، یادآوری). سایر ماژول‌ها در فازهای بعدی ساخته
+آیتم‌ها، انشعاب)، Survey (چرخه‌ی عمر نظرسنجی، قالب‌ها، پرچم ناشناس)، Campaign
+(زمان‌بندی، جمعیت هدف، توزیع، یادآوری) و Response (ثبت پاسخ، ذخیره‌ی جزئی،
+ارسال، پاسخ‌های ناشناس). سایر ماژول‌ها در فازهای بعدی ساخته
 می‌شوند. به جدول فازها در پروژه‌ی معماری مراجعه کنید.
 
 ## عیب‌یابی

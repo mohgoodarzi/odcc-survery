@@ -238,3 +238,18 @@ public sealed record ReminderProcessResultDto
     /// <summary>تعداد گیرندگانی که شمارنده‌ی یادآورشان افزایش یافت.</summary>
     public int RecipientsNotified { get; init; }
 }
+
+/// <summary>
+/// دعوت‌نامه‌ی باز یک کارمند: ارسال‌شده ولی هنوز پاسخ‌داده‌نشده.
+/// این DTO فقط برای خواندن توسط ماژول پاسخ‌ها استفاده می‌شود تا آن ماژول
+/// به موجودیت‌های داخلی کمپین دسترسی مستقیم نداشته باشد (مرز ماژول‌ها).
+/// </summary>
+public sealed record OpenDistributionDto
+{
+    public Guid Id { get; init; }
+    public Guid CampaignId { get; init; }
+    public string? CampaignCode { get; init; }
+    public DistributionChannel Channel { get; init; }
+    public Guid SurveyId { get; init; }
+    public Guid EmployeeId { get; init; }
+}

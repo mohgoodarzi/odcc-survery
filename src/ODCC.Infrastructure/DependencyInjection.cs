@@ -14,6 +14,7 @@ using ODCC.Application.Modules.QuestionBank.Abstractions;
 using ODCC.Application.Modules.Questionnaire.Abstractions;
 using ODCC.Application.Modules.Survey.Abstractions;
 using ODCC.Application.Modules.Campaign.Abstractions;
+using ODCC.Application.Modules.Response.Abstractions;
 using ODCC.Infrastructure.Modules.Audit.EventListeners;
 using ODCC.Infrastructure.Modules.Identity;
 using ODCC.Infrastructure.Modules.Identity.Entities;
@@ -39,6 +40,10 @@ using ODCC.Infrastructure.Modules.Campaign.EventListeners;
 using ODCC.Infrastructure.Modules.Campaign.Persistence;
 using ODCC.Infrastructure.Modules.Campaign.Repositories;
 using ODCC.Infrastructure.Modules.Campaign.Services;
+using ODCC.Infrastructure.Modules.Response.EventListeners;
+using ODCC.Infrastructure.Modules.Response.Persistence;
+using ODCC.Infrastructure.Modules.Response.Repositories;
+using ODCC.Infrastructure.Modules.Response.Services;
 using ODCC.Infrastructure.Persistence;
 using ODCC.Infrastructure.Persistence.Audit;
 using ODCC.Infrastructure.Repositories.Audit;
@@ -110,6 +115,15 @@ public static class DependencyInjection
         services.AddScoped<IDomainEventListener<Domain.Modules.Campaign.Events.CampaignCompletedEvent>, CampaignAuditEventListener>();
         services.AddScoped<IDomainEventListener<Domain.Modules.Campaign.Events.CampaignArchivedEvent>, CampaignAuditEventListener>();
 
+        // شنونده‌ی رویدادهای ماژول پاسخ‌ها.
+        services.AddScoped<IDomainEventListener<Domain.Modules.Response.Events.ResponseStartedEvent>, ResponseAuditEventListener>();
+
+        // شنونده‌ی کمپین: دعوت‌نامه‌ای که از طریق آن پاسخی ثبت شده را
+        // «پاسخ‌داده» علامت می‌زند. این شنونده در ماژول کمپین ثبت می‌شود
+        // چون تغییر روی موجودیت‌های کمپین است، ولی به رویداد ماژول پاسخ گوش می‌دهد.
+        services.AddScoped<IDomainEventListener<Domain.Modules.Response.Events.ResponseSubmittedEvent>, ResponseAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Response.Events.ResponseSubmittedEvent>, CampaignResponseEventListener>();
+
         ConfigureAudit(services, connectionString, configure);
         ConfigureIdentity(services, connectionString, configure);
         ConfigureOrganization(services, connectionString, configure);
@@ -117,6 +131,7 @@ public static class DependencyInjection
         ConfigureQuestionnaire(services, connectionString, configure);
         ConfigureSurvey(services, connectionString, configure);
         ConfigureCampaign(services, connectionString, configure);
+        ConfigureResponse(services, connectionString, configure);
 
         return services;
     }
@@ -332,6 +347,24 @@ public static class DependencyInjection
         services.AddScoped<IDistributionRepository, DistributionRepository>();
         services.AddScoped<ICampaignService, CampaignService>();
         services.AddScoped<ICampaignUnitOfWork, CampaignUnitOfWork>();
+    }
+
+    // --- ماژول پاسخ‌ها -----------------------------------------------------
+
+    private static void ConfigureResponse(
+        IServiceCollection services,
+        string connectionString,
+        Action<DbContextOptionsBuilder>? configure)
+    {
+        services.AddDbContext<ResponseDbContext>(options =>
+        {
+            ConfigureSql(options, connectionString);
+            configure?.Invoke(options);
+        });
+
+        services.AddScoped<IResponseRepository, ResponseRepository>();
+        services.AddScoped<IResponseService, ResponseService>();
+        services.AddScoped<IResponseUnitOfWork, ResponseUnitOfWork>();
     }
 
     private static void ConfigureSql(DbContextOptionsBuilder options, string connectionString)

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using ODCC.Application.Languages;
 using ODCC.Application.Modules.Survey.Abstractions;
 using ODCC.Application.Modules.Survey.Dtos;
 using ODCC.Domain.Modules.Survey.Entities;
@@ -60,6 +61,37 @@ public sealed class SurveyRepository(SurveyDbContext dbContext) : ISurveyReposit
 
     public async Task<int> CountAsync(SurveySearchRequest request, CancellationToken ct = default) =>
         await BuildSearchQuery(request).CountAsync(ct);
+
+    /// <summary>
+    /// نظرسنجی‌های پاسخ‌پذیر (فعال و منقضی‌نشده)، مرتب‌شده بر اساس جدیدترین
+    /// فعالیت. ترجمه‌ها این‌جا انتخاب می‌شوند تا ماژول پاسخ‌ها به جدول
+    /// ترجمه‌های ماژول نظرسنجی دسترسی مستقیم نداشته باشد.
+    /// </summary>
+    public async Task<IReadOnlyList<RespondableSurveySummaryDto>> GetRespondableAsync(CancellationToken ct = default)
+    {
+        var surveys = await _dbContext.Surveys
+            .Include(s => s.Localizations)
+            .AsNoTracking()
+            .Where(s => s.Status == ODCC.Domain.Modules.Survey.Enums.SurveyStatus.Active)
+            .OrderByDescending(s => s.ActivatedAt ?? s.PublishedAt ?? s.CreatedAt)
+            .ToListAsync(ct);
+
+        return surveys.ConvertAll(survey =>
+        {
+            var picked = survey.Localizations.Pick(ODCC.Domain.Common.Language.Fa);
+
+            return new RespondableSurveySummaryDto
+            {
+                Id = survey.Id,
+                Code = survey.Code,
+                IsAnonymous = survey.IsAnonymous,
+                AcceptsResponses = survey.AcceptsResponses,
+                EstimatedMinutes = survey.EstimatedMinutes,
+                Title = picked?.Title ?? survey.Localizations.FirstOrDefault()?.Title ?? survey.Code,
+                Description = picked?.Description
+            };
+        });
+    }
 
     private IQueryable<SurveyEntity> BuildSearchQuery(SurveySearchRequest request)
     {

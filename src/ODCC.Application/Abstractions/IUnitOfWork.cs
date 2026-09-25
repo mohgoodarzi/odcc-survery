@@ -44,6 +44,11 @@ public interface ISurveyUnitOfWork : IUnitOfWork;
 public interface ICampaignUnitOfWork : IUnitOfWork;
 
 /// <summary>
+/// مرز تراکنشی ماژول پاسخ‌ها. فقط این ماژول باید آن را تزریق بگیرد.
+/// </summary>
+public interface IResponseUnitOfWork : IUnitOfWork;
+
+/// <summary>
 /// مشخصه‌ی پرس‌وجوی قابل‌استفاده مجدد: فیلتر، مرتب‌سازی و بارگذاری ناوبری.
 /// </summary>
 public interface ISpecification<T> where T : BaseEntity

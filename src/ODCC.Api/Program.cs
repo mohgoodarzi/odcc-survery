@@ -27,6 +27,7 @@ using ODCC.Infrastructure.Modules.QuestionBank.Persistence;
 using ODCC.Infrastructure.Modules.Questionnaire.Persistence;
 using ODCC.Infrastructure.Modules.Survey.Persistence;
 using ODCC.Infrastructure.Modules.Campaign.Persistence;
+using ODCC.Infrastructure.Modules.Response.Persistence;
 using ODCC.Infrastructure.Persistence.Audit;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -153,7 +154,8 @@ builder.Services.AddHealthChecks()
     .AddDbContextCheck<QuestionBankDbContext>("sql-server-question-bank")
     .AddDbContextCheck<QuestionnaireDbContext>("sql-server-questionnaire")
     .AddDbContextCheck<SurveyDbContext>("sql-server-survey")
-    .AddDbContextCheck<CampaignDbContext>("sql-server-campaign");
+    .AddDbContextCheck<CampaignDbContext>("sql-server-campaign")
+    .AddDbContextCheck<ResponseDbContext>("sql-server-response");
 
 var app = builder.Build();
 

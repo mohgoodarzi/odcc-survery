@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, FileText, Megaphone, BarChart3, FileBarChart, Settings, Languages,
   Users, ShieldCheck, Building2, Briefcase, UserCircle, LogOut, ChevronDown,
-  LayoutTemplate
+  LayoutTemplate, ClipboardCheck, MessageSquareText
 } from 'lucide-react';
 
 import { useAuth } from '@/auth/AuthProvider';
@@ -48,6 +48,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
       permissions: [Permissions.Survey.View]
     },
     { to: `/${culture}/campaigns`, label: t.nav.campaigns, icon: Megaphone, permissions: [Permissions.Campaign.View] },
+    { to: `/${culture}/my-surveys`, label: t.nav.mySurveys, icon: ClipboardCheck },
+    {
+      to: `/${culture}/responses`,
+      label: t.nav.responses,
+      icon: MessageSquareText,
+      permissions: [Permissions.Response.View]
+    },
     { to: `/${culture}/analytics`, label: t.nav.analytics, icon: BarChart3 },
     { to: `/${culture}/reports`, label: t.nav.reports, icon: FileBarChart },
     {

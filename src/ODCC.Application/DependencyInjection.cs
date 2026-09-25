@@ -8,6 +8,7 @@ using ODCC.Application.Modules.QuestionBank.Dtos;
 using ODCC.Application.Modules.Questionnaire.Dtos;
 using ODCC.Application.Modules.Survey.Dtos;
 using ODCC.Application.Modules.Campaign.Dtos;
+using ODCC.Application.Modules.Response.Dtos;
 
 namespace ODCC.Application;
 
@@ -30,6 +31,7 @@ public static class DependencyInjection
         services.AddValidatorsFromAssemblyContaining<SaveQuestionnaireRequestValidator>();
         services.AddValidatorsFromAssemblyContaining<SaveSurveyRequestValidator>();
         services.AddValidatorsFromAssemblyContaining<SaveCampaignRequestValidator>();
+        services.AddValidatorsFromAssemblyContaining<SaveAnswersRequestValidator>();
 
         return services;
     }

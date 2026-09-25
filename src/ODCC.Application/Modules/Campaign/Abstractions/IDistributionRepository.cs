@@ -36,5 +36,12 @@ public interface IDistributionRepository
     /// <summary>ردیف‌های توزیعِ یک کمپین که هنوز پاسخ نداده‌اند (برای یادآورها: در صف یا ارسال‌شده).</summary>
     Task<IReadOnlyList<Distribution>> GetRemindableAsync(Guid campaignId, CancellationToken ct = default);
 
+    /// <summary>
+    /// دعوت‌نامه‌های باز یک کارمند (ارسال‌شده ولی هنوز پاسخ‌داده‌نشده).
+    /// این متد برای ماژول پاسخ‌هاست تا نشست پاسخ‌گویی را به دعوت‌نامه‌اش پیوند بزند؛
+    /// به همین دلیل DTO برمی‌گرداند، نه موجودیت داخلی.
+    /// </summary>
+    Task<IReadOnlyList<OpenDistributionDto>> GetOpenByEmployeeAsync(Guid employeeId, CancellationToken ct = default);
+
     void Update(Distribution distribution);
 }

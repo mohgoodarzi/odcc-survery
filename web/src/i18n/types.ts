@@ -38,6 +38,8 @@ export interface Dictionary {
     positions: string;
     employees: string;
     administration: string;
+    mySurveys: string;
+    responses: string;
   };
   common: {
     search: string;
@@ -467,5 +469,80 @@ export interface Dictionary {
   dashboard: {
     responses: string;
     averageNps: string;
+  };
+  responses: {
+    title: string;
+    description: string;
+    /** فهرست «نظرسنجی‌های من». */
+    mySurveys: string;
+    mySurveysDescription: string;
+    estimatedMinutes: string;
+    anonymous: string;
+    anonymousHint: string;
+    startResponse: string;
+    continueResponse: string;
+    reviewResponse: string;
+    noSurveys: string;
+    noSurveysDescription: string;
+    invitedViaCampaign: string;
+    /** صفحه‌ی پاسخ‌گویی. */
+    answeringTitle: string;
+    welcome: string;
+    thankYou: string;
+    thankYouDescription: string;
+    backToMySurveys: string;
+    section: string;
+    question: string;
+    requiredHint: string;
+    optionalHint: string;
+    saveDraft: string;
+    submitting: string;
+    submitResponse: string;
+    submitConfirmTitle: string;
+    submitConfirmDescription: string;
+    savingDraft: string;
+    draftSaved: string;
+    responseSubmitted: string;
+    answerCount: string;
+    progressBar: string;
+    anonymousNote: string;
+    selectOption: string;
+    chooseYesNo: string;
+    enterRating: string;
+    enterNumber: string;
+    enterText: string;
+    /** مدیریت / فهرست نشست‌ها. */
+    managementTitle: string;
+    managementDescription: string;
+    respondent: string;
+    anonymousRespondent: string;
+    status: string;
+    statusInProgress: string;
+    statusSubmitted: string;
+    all: string;
+    searchPlaceholder: string;
+    noSessions: string;
+    noSessionsDescription: string;
+    startedAt: string;
+    submittedAt: string;
+    surveyCode: string;
+    campaignCode: string;
+    viewSession: string;
+    deleteSession: string;
+    deleteConfirmTitle: string;
+    deleteConfirmDescription: string;
+    sessionDeleted: string;
+    /** کدهای خطای سمت سرور. */
+    errorSurveyNotRespondable: string;
+    errorAuthenticationRequired: string;
+    errorResponseAlreadySubmitted: string;
+    errorResponseNotEditable: string;
+    errorSurveyNotOpen: string;
+    errorResponseSessionNotFound: string;
+    errorResponseAccessDenied: string;
+    errorDistributionNotValid: string;
+    errorCampaignNotValid: string;
+    errorQuestionnaireNotAvailable: string;
+    errorRequiredQuestions: string;
   };
 }

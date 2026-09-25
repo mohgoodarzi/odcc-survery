@@ -18,6 +18,13 @@ import {
   type DistributionSearchRequest,
   type SaveCampaignRequest
 } from '@/api/campaigns';
+import {
+  responsesApi,
+  ResponseStatus,
+  type SaveAnswersRequest,
+  type StartSessionRequest,
+  type SubmitResponseRequest
+} from '@/api/responses';
 import { useLanguage } from '@/i18n/LanguageProvider';
 
 /**
@@ -66,7 +73,18 @@ export const queryKeys = {
   campaigns: ['campaigns'] as const,
   campaign: (id: string | null) => ['campaigns', 'detail', id] as const,
   campaignDistributions: (campaignId: string | null, status: number | null, page: number) =>
-    ['campaigns', 'distributions', campaignId, status, page] as const
+    ['campaigns', 'distributions', campaignId, status, page] as const,
+  mySurveys: (page: number) => ['responses', 'my-surveys', page] as const,
+  respondentContext: (surveyId: string | null) =>
+    ['responses', 'context', surveyId] as const,
+  responses: ['responses'] as const,
+  responseSession: (sessionId: string | null) => ['responses', 'detail', sessionId] as const,
+  responseSearch: (
+    searchText: string | null,
+    surveyId: string | null,
+    status: number | null,
+    page: number
+  ) => ['responses', 'search', searchText, surveyId, status, page] as const
 };
 
 export function useUsersSearch(params: {
@@ -775,3 +793,123 @@ export function useProcessDueReminders() {
 }
 
 export type CampaignAction = 'schedule' | 'launch' | 'complete' | 'archive';
+
+// --- پاسخ‌ها -----------------------------------------------------------------
+
+export function useMySurveys(page = 1) {
+  const { culture } = useLanguage();
+
+  return useQuery({
+    queryKey: queryKeys.mySurveys(page),
+    queryFn: ({ signal }) => responsesApi.mySurveys(culture, page, 50, signal)
+  });
+}
+
+export function useRespondentContext(surveyId: string | null) {
+  const { culture } = useLanguage();
+
+  return useQuery({
+    queryKey: queryKeys.respondentContext(surveyId),
+    queryFn: ({ signal }) => responsesApi.getRespondentContext(culture, surveyId as string, signal),
+    enabled: !!surveyId
+  });
+}
+
+function useInvalidateResponses() {
+  const queryClient = useQueryClient();
+
+  // invalidation با پیشوند «responses» هم فهرست، هم بسته‌ی پاسخ‌گویی و هم
+  // جزئیات نشست را پوشش می‌دهد.
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.responses });
+  };
+}
+
+/**
+ * شروع یا از سرگیری یک نشست پاسخ‌گویی.
+ * هنگام شروع، شناسه‌ی دعوت‌نامه (در صورت ورود از طریق کمپین) ارسال می‌شود
+ * تا نشست به دعوت‌نامه‌ی راستی‌آزمایی‌شده پیوند بخورد.
+ */
+export function useStartSession() {
+  const { culture } = useLanguage();
+  const invalidate = useInvalidateResponses();
+
+  return useMutation({
+    mutationFn: (request: StartSessionRequest) => responsesApi.startSession(culture, request),
+    onSuccess: () => invalidate()
+  });
+}
+
+/**
+ * ذخیره‌ی جزئی پاسخ‌ها: سؤال‌های اجباری اعتبارسنجی نمی‌شوند تا کاربر بتواند
+ * هر از گاهی پیش‌نویس خود را ذخیره کند.
+ */
+export function useSaveAnswers() {
+  const { culture } = useLanguage();
+  const invalidate = useInvalidateResponses();
+
+  return useMutation({
+    mutationFn: ({ sessionId, request }: { sessionId: string; request: SaveAnswersRequest }) =>
+      responsesApi.saveAnswers(culture, sessionId, request),
+    onSuccess: () => invalidate()
+  });
+}
+
+/**
+ * ارسال نهایی پاسخ‌ها: سؤال‌های اجباری سمت سرور اعتبارسنجی می‌شوند.
+ */
+export function useSubmitResponse() {
+  const { culture } = useLanguage();
+  const invalidate = useInvalidateResponses();
+
+  return useMutation({
+    mutationFn: ({ sessionId, request }: { sessionId: string; request: SubmitResponseRequest }) =>
+      responsesApi.submit(culture, sessionId, request),
+    onSuccess: () => invalidate()
+  });
+}
+
+export function useResponsesSearch(params: {
+  searchText: string | null;
+  surveyId: string | null;
+  status: number | null;
+  page: number;
+}) {
+  const { culture } = useLanguage();
+
+  return useQuery({
+    queryKey: queryKeys.responseSearch(params.searchText, params.surveyId, params.status, params.page),
+    queryFn: ({ signal }) =>
+      responsesApi.search(
+        culture,
+        {
+          searchText: params.searchText,
+          surveyId: params.surveyId,
+          status: params.status as ResponseStatus | null,
+          page: params.page,
+          pageSize: 20
+        },
+        signal
+      )
+  });
+}
+
+export function useResponseSession(sessionId: string | null) {
+  const { culture } = useLanguage();
+
+  return useQuery({
+    queryKey: queryKeys.responseSession(sessionId),
+    queryFn: ({ signal }) => responsesApi.getById(culture, sessionId as string, signal),
+    enabled: !!sessionId
+  });
+}
+
+export function useDeleteResponse() {
+  const { culture } = useLanguage();
+  const invalidate = useInvalidateResponses();
+
+  return useMutation({
+    mutationFn: responsesApi.delete.bind(null, culture),
+    onSuccess: () => invalidate()
+  });
+}
