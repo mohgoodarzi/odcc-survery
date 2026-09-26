@@ -70,6 +70,9 @@ dotnet ef migrations add InitialCreate -p src/ODCC.Infrastructure -s src/ODCC.Ap
 # ماژول پاسخ‌ها (نشست‌های پاسخ‌گویی، پاسخ‌ها، گزینه‌های انتخابی)
 dotnet ef migrations add InitialCreate -p src/ODCC.Infrastructure -s src/ODCC.Api -c ResponseDbContext -o Modules/Response/Persistence/Migrations
 
+# ماژول تحلیلات (عکس‌العمل‌های محاسبه‌شده، بنچمارک‌ها)
+dotnet ef migrations add InitialCreate -p src/ODCC.Infrastructure -s src/ODCC.Api -c AnalyticsDbContext -o Modules/Analytics/Persistence/Migrations
+
 # اعمال همه‌ی مهاجرت‌ها (پس از تأیید)
 dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c AuditDbContext
 dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c IdentityDbContext
@@ -79,6 +82,7 @@ dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c Question
 dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c SurveyDbContext
 dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c CampaignDbContext
 dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c ResponseDbContext
+dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c AnalyticsDbContext
 ```
 
 > **هیچ‌کدام از این دستورات را تا دریافت تأیید اجرا نکنید.**
@@ -153,15 +157,16 @@ dotnet publish src/ODCC.Api -c Release -o ./publish
 ## وضعیت پروژه
 
 **فاز ۰** (زیرساخت و مبنا)، **فاز ۱** (هویت، مجوزدهی و سازمان)، **فاز ۲**
-(کتابخانه‌ی سؤالات و پرسشنامه)، **فاز ۳** (نظرسنجی و کمپین) و **فاز ۴**
-(مدیریت پاسخ) پیاده‌سازی شده‌اند.
+(کتابخانه‌ی سؤالات و پرسشنامه)، **فاز ۳** (نظرسنجی و کمپین)، **فاز ۴**
+(مدیریت پاسخ) و **فاز ۵** (تحلیلات و داشبورد) پیاده‌سازی شده‌اند.
 ماژول‌های پیاده‌سازی‌شده تاکنون: Audit (ماژول مرجع)، Identity (کاربران، نقش‌ها،
 JWT، توکن‌های تازه‌سازی)، Organization (واحدهای سازمانی، موقعیت‌ها، کارمندان)،
 QuestionBank (سؤالات قابل‌استفاده‌ی مجدد، نسخه‌گذاری)، Questionnaire (بخش‌ها،
 آیتم‌ها، انشعاب)، Survey (چرخه‌ی عمر نظرسنجی، قالب‌ها، پرچم ناشناس)، Campaign
-(زمان‌بندی، جمعیت هدف، توزیع، یادآوری) و Response (ثبت پاسخ، ذخیره‌ی جزئی،
-ارسال، پاسخ‌های ناشناس). سایر ماژول‌ها در فازهای بعدی ساخته
-می‌شوند. به جدول فازها در پروژه‌ی معماری مراجعه کنید.
+(زمان‌بندی، جمعیت هدف، توزیع، یادآوری)، Response (ثبت پاسخ، ذخیره‌ی جزئی،
+ارسال، پاسخ‌های ناشناس) و Analytics (شاخص‌های NPS/CSAT/CES، مدل خواندنی،
+داشبورد، روند زمانی، بخش‌بندی سازمانی، بنچمارک‌ها). سایر ماژول‌ها در فازهای
+بعدی ساخته می‌شوند. به جدول فازها در پروژه‌ی معماری مراجعه کنید.
 
 ## عیب‌یابی
 

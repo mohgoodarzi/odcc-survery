@@ -19,10 +19,10 @@ export enum QuestionType {
   SingleChoice = 1,
   MultipleChoice = 2,
   Rating = 3,
-  Number = 4,
+  YesNo = 4,
   ShortText = 5,
   LongText = 6,
-  YesNo = 7
+  Number = 7
 }
 
 export enum BranchingCondition {

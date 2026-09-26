@@ -16,6 +16,7 @@ using ODCC.Application.Modules.Questionnaire.Abstractions;
 using ODCC.Application.Modules.Survey.Abstractions;
 using ODCC.Application.Modules.Campaign.Abstractions;
 using ODCC.Application.Modules.Response.Abstractions;
+using ODCC.Application.Modules.Analytics.Abstractions;
 using ODCC.Infrastructure.Modules.Audit.EventListeners;
 using ODCC.Infrastructure.Repositories.Audit;
 using ODCC.Infrastructure.Modules.Identity;
@@ -43,6 +44,10 @@ using ODCC.Infrastructure.Modules.Response.EventListeners;
 using ODCC.Infrastructure.Modules.Response.Persistence;
 using ODCC.Infrastructure.Modules.Response.Repositories;
 using ODCC.Infrastructure.Modules.Response.Services;
+using ODCC.Infrastructure.Modules.Analytics.EventListeners;
+using ODCC.Infrastructure.Modules.Analytics.Persistence;
+using ODCC.Infrastructure.Modules.Analytics.Repositories;
+using ODCC.Infrastructure.Modules.Analytics.Services;
 using ODCC.Infrastructure.Modules.Organization.Persistence;
 using ODCC.Infrastructure.Modules.Organization.Repositories;
 using ODCC.Infrastructure.Modules.Organization.Services;
@@ -71,6 +76,7 @@ public sealed class TestEnvironment : IAsyncDisposable
     public SurveyDbContext SurveyDbContext { get; }
     public CampaignDbContext CampaignDbContext { get; }
     public ResponseDbContext ResponseDbContext { get; }
+    public AnalyticsDbContext AnalyticsDbContext { get; }
 
     private readonly SqliteConnection _identityConnection;
     private readonly SqliteConnection _organizationConnection;
@@ -80,6 +86,7 @@ public sealed class TestEnvironment : IAsyncDisposable
     private readonly SqliteConnection _surveyConnection;
     private readonly SqliteConnection _campaignConnection;
     private readonly SqliteConnection _responseConnection;
+    private readonly SqliteConnection _analyticsConnection;
 
     private TestEnvironment(
         IServiceProvider services,
@@ -90,6 +97,7 @@ public sealed class TestEnvironment : IAsyncDisposable
         SurveyDbContext surveyDbContext,
         CampaignDbContext campaignDbContext,
         ResponseDbContext responseDbContext,
+        AnalyticsDbContext analyticsDbContext,
         SqliteConnection identityConnection,
         SqliteConnection organizationConnection,
         SqliteConnection auditConnection,
@@ -97,7 +105,8 @@ public sealed class TestEnvironment : IAsyncDisposable
         SqliteConnection questionnaireConnection,
         SqliteConnection surveyConnection,
         SqliteConnection campaignConnection,
-        SqliteConnection responseConnection)
+        SqliteConnection responseConnection,
+        SqliteConnection analyticsConnection)
     {
         Services = services;
         IdentityDbContext = identityDbContext;
@@ -107,6 +116,7 @@ public sealed class TestEnvironment : IAsyncDisposable
         SurveyDbContext = surveyDbContext;
         CampaignDbContext = campaignDbContext;
         ResponseDbContext = responseDbContext;
+        AnalyticsDbContext = analyticsDbContext;
         _identityConnection = identityConnection;
         _organizationConnection = organizationConnection;
         _auditConnection = auditConnection;
@@ -115,6 +125,7 @@ public sealed class TestEnvironment : IAsyncDisposable
         _surveyConnection = surveyConnection;
         _campaignConnection = campaignConnection;
         _responseConnection = responseConnection;
+        _analyticsConnection = analyticsConnection;
     }
 
     /// <summary>
@@ -147,6 +158,9 @@ public sealed class TestEnvironment : IAsyncDisposable
         var responseConnection = new SqliteConnection("DataSource=:memory:");
         await responseConnection.OpenAsync();
 
+        var analyticsConnection = new SqliteConnection("DataSource=:memory:");
+        await analyticsConnection.OpenAsync();
+
         var services = new ServiceCollection();
 
         services.AddLogging();
@@ -175,6 +189,9 @@ public sealed class TestEnvironment : IAsyncDisposable
 
         services.AddDbContext<ResponseDbContext>(options =>
             options.UseSqlite(responseConnection));
+
+        services.AddDbContext<AnalyticsDbContext>(options =>
+            options.UseSqlite(analyticsConnection));
 
         services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
             {
@@ -233,6 +250,8 @@ public sealed class TestEnvironment : IAsyncDisposable
         services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Response.Events.ResponseStartedEvent>, ResponseAuditEventListener>();
         services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Response.Events.ResponseSubmittedEvent>, ResponseAuditEventListener>();
         services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Response.Events.ResponseSubmittedEvent>, CampaignResponseEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Response.Events.ResponseSubmittedEvent>, AnalyticsResponseEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Analytics.Events.AnalyticsComputedEvent>, AnalyticsAuditEventListener>();
         services.AddScoped<IAuditEntryRepository, AuditEntryRepository>();
         services.AddScoped<IAuditService, AuditService>();
         services.AddScoped<IRefreshTokenStore, RefreshTokenStore>();
@@ -244,6 +263,7 @@ public sealed class TestEnvironment : IAsyncDisposable
         services.AddScoped<ISurveyUnitOfWork, SurveyUnitOfWork>();
         services.AddScoped<ICampaignUnitOfWork, CampaignUnitOfWork>();
         services.AddScoped<IResponseUnitOfWork, ResponseUnitOfWork>();
+        services.AddScoped<IAnalyticsUnitOfWork, AnalyticsUnitOfWork>();
 
         services.AddScoped<IOrgUnitRepository, OrgUnitRepository>();
         services.AddScoped<IPositionRepository, PositionRepository>();
@@ -255,6 +275,10 @@ public sealed class TestEnvironment : IAsyncDisposable
         services.AddScoped<ICampaignRepository, CampaignRepository>();
         services.AddScoped<IDistributionRepository, DistributionRepository>();
         services.AddScoped<IResponseRepository, ResponseRepository>();
+
+        services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();
+        services.AddScoped<IBenchmarkRepository, BenchmarkRepository>();
+        services.AddScoped<AnalyticsComputationEngine>();
 
         services.AddScoped<IOrgUnitService, OrgUnitService>();
         services.AddScoped<IPositionService, PositionService>();
@@ -268,6 +292,12 @@ public sealed class TestEnvironment : IAsyncDisposable
         services.AddScoped<ISurveyTemplateService, SurveyTemplateService>();
         services.AddScoped<ICampaignService, CampaignService>();
         services.AddScoped<IResponseService, ResponseService>();
+
+        services.AddScoped<IAnalyticsService, AnalyticsService>();
+        services.AddScoped<IBenchmarkService, BenchmarkService>();
+
+        // پیاده‌سازی پیش‌فرض و بدون اثر هوش مصنوعی — هیچ داده‌ای از سامانه خارج نمی‌شود.
+        services.AddSingleton<IAnalyticsAiService, NoOpAnalyticsAiService>();
 
         // داده‌ی اولیه (bootstrap). رمز عبور آزمون هرگز در production نیست.
         services.AddSingleton(Options.Create(new SeedOptions
@@ -293,6 +323,7 @@ public sealed class TestEnvironment : IAsyncDisposable
         var surveyDbContext = provider.GetRequiredService<SurveyDbContext>();
         var campaignDbContext = provider.GetRequiredService<CampaignDbContext>();
         var responseDbContext = provider.GetRequiredService<ResponseDbContext>();
+        var analyticsDbContext = provider.GetRequiredService<AnalyticsDbContext>();
 
         await identityDbContext.Database.EnsureCreatedAsync();
         await organizationDbContext.Database.EnsureCreatedAsync();
@@ -302,13 +333,14 @@ public sealed class TestEnvironment : IAsyncDisposable
         await surveyDbContext.Database.EnsureCreatedAsync();
         await campaignDbContext.Database.EnsureCreatedAsync();
         await responseDbContext.Database.EnsureCreatedAsync();
+        await analyticsDbContext.Database.EnsureCreatedAsync();
 
         return new TestEnvironment(provider, identityDbContext, organizationDbContext,
             questionBankDbContext, questionnaireDbContext, surveyDbContext, campaignDbContext,
-            responseDbContext,
+            responseDbContext, analyticsDbContext,
             identityConnection, organizationConnection, auditConnection,
             questionBankConnection, questionnaireConnection, surveyConnection, campaignConnection,
-            responseConnection);
+            responseConnection, analyticsConnection);
     }
 
     /// <summary>
@@ -412,6 +444,7 @@ public sealed class TestEnvironment : IAsyncDisposable
         await SurveyDbContext.DisposeAsync();
         await CampaignDbContext.DisposeAsync();
         await ResponseDbContext.DisposeAsync();
+        await AnalyticsDbContext.DisposeAsync();
         await _identityConnection.DisposeAsync();
         await _organizationConnection.DisposeAsync();
         await _auditConnection.DisposeAsync();
@@ -420,6 +453,7 @@ public sealed class TestEnvironment : IAsyncDisposable
         await _surveyConnection.DisposeAsync();
         await _campaignConnection.DisposeAsync();
         await _responseConnection.DisposeAsync();
+        await _analyticsConnection.DisposeAsync();
         if (Services is IDisposable disposable)
         {
             disposable.Dispose();

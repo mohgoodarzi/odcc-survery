@@ -91,7 +91,8 @@ public class LayeringTests
             "ODCC.Infrastructure.Modules.Questionnaire",
             "ODCC.Infrastructure.Modules.Survey",
             "ODCC.Infrastructure.Modules.Campaign",
-            "ODCC.Infrastructure.Modules.Response"
+            "ODCC.Infrastructure.Modules.Response",
+            "ODCC.Infrastructure.Modules.Analytics"
         };
 
         var result = Types.InAssembly(ApplicationAssembly)

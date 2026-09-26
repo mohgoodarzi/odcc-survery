@@ -93,6 +93,85 @@ public sealed class ResponseRepository(ResponseDbContext dbContext) : IResponseR
         await _dbContext.Sessions.CountAsync(s =>
             s.SurveyId == surveyId && s.Status == ResponseStatus.Submitted, ct);
 
+    /// <summary>
+    /// همه‌ی نشست‌های ارسال‌شده‌ی یک نظرسنجی به‌همراه پاسخ‌ها و گزینه‌های انتخابی.
+    /// فقط برای محاسبه‌ی تجمع‌ها در ماژول تحلیلات (از طریق قرارداد).
+    /// </summary>
+    public async Task<IReadOnlyList<ResponseSessionEntity>> ListSubmittedBySurveyAsync(
+        Guid surveyId, DateTime? fromUtc = null, DateTime? toUtc = null, CancellationToken ct = default)
+    {
+        var query = _dbContext.Sessions
+            .Include(s => s.Answers)
+            .ThenInclude(a => a.Selections)
+            .AsNoTracking()
+            .Where(s => s.SurveyId == surveyId && s.Status == ResponseStatus.Submitted);
+
+        if (fromUtc.HasValue)
+            query = query.Where(s => s.SubmittedAt >= fromUtc.Value);
+
+        if (toUtc.HasValue)
+            query = query.Where(s => s.SubmittedAt <= toUtc.Value);
+
+        return await query.ToListAsync(ct);
+    }
+
+    /// <summary>
+    /// همه‌ی نشست‌های یک نظرسنجی (شامل در حال تکمیل و ارسال‌شده) — بدون پاسخ‌ها.
+    /// فقط برای محاسبه‌ی مخرج نرخ تکمیل در ماژول تحلیلات (از طریق قرارداد):
+    /// نشست‌هایی که شروع شده‌اند ولی هنوز ارسال نشده‌اند، افت پاسخ کامل را
+    /// نشان می‌دهند. فیلتر زمانی بر اساس شروع نشست است.
+    /// </summary>
+    public async Task<IReadOnlyList<ResponseSessionEntity>> ListAllBySurveyAsync(
+        Guid surveyId, DateTime? fromUtc = null, DateTime? toUtc = null, CancellationToken ct = default)
+    {
+        var query = _dbContext.Sessions
+            .AsNoTracking()
+            .Where(s => s.SurveyId == surveyId);
+
+        if (fromUtc.HasValue)
+            query = query.Where(s => s.StartedAt >= fromUtc.Value);
+
+        if (toUtc.HasValue)
+            query = query.Where(s => s.StartedAt <= toUtc.Value);
+
+        return await query.ToListAsync(ct);
+    }
+
+    /// <summary>
+    /// خلاصه‌ی نشست‌های ارسال‌شده‌ی چند نظرسنجی — فقط فیلدهای تجمعی، بدون
+    /// جابه‌جایی پاسخ‌های خام (projection سمت پایگاه داده).
+    /// </summary>
+    public async Task<IReadOnlyList<SubmittedSessionSummary>> ListSubmittedAsync(
+        IReadOnlyCollection<Guid> surveyIds, DateTime? fromUtc = null, DateTime? toUtc = null, CancellationToken ct = default)
+    {
+        if (surveyIds.Count == 0)
+            return [];
+
+        var query = _dbContext.Sessions
+            .AsNoTracking()
+            .Where(s => s.Status == ResponseStatus.Submitted && surveyIds.Contains(s.SurveyId));
+
+        if (fromUtc.HasValue)
+            query = query.Where(s => s.SubmittedAt >= fromUtc.Value);
+
+        if (toUtc.HasValue)
+            query = query.Where(s => s.SubmittedAt <= toUtc.Value);
+
+        return await query
+            .Select(s => new SubmittedSessionSummary
+            {
+                SessionId = s.Id,
+                SurveyId = s.SurveyId,
+                CampaignId = s.CampaignId,
+                SubmittedAt = s.SubmittedAt!.Value,
+                StartedAt = s.StartedAt,
+                RespondentEmployeeId = s.RespondentEmployeeId,
+                Source = s.Source,
+                AnswerCount = s.AnswerCount
+            })
+            .ToListAsync(ct);
+    }
+
     private IQueryable<ResponseSessionEntity> BuildSearchQuery(ResponseSearchRequest request)
     {
         var query = _dbContext.Sessions

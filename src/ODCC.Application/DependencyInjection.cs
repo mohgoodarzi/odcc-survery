@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using ODCC.Application.Modules.Audit.Abstractions;
 using ODCC.Application.Modules.Audit.Services;
+using ODCC.Application.Modules.Analytics.Dtos;
 using ODCC.Application.Modules.Identity.Dtos;
 using ODCC.Application.Modules.Organization.Dtos;
 using ODCC.Application.Modules.QuestionBank.Dtos;
@@ -32,6 +33,7 @@ public static class DependencyInjection
         services.AddValidatorsFromAssemblyContaining<SaveSurveyRequestValidator>();
         services.AddValidatorsFromAssemblyContaining<SaveCampaignRequestValidator>();
         services.AddValidatorsFromAssemblyContaining<SaveAnswersRequestValidator>();
+        services.AddValidatorsFromAssemblyContaining<ComputeAnalyticsRequestValidator>();
 
         return services;
     }

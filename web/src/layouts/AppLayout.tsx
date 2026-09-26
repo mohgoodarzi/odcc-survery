@@ -55,7 +55,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
       icon: MessageSquareText,
       permissions: [Permissions.Response.View]
     },
-    { to: `/${culture}/analytics`, label: t.nav.analytics, icon: BarChart3 },
+    {
+      to: `/${culture}/analytics`,
+      label: t.nav.analytics,
+      icon: BarChart3,
+      permissions: [Permissions.Analytics.View]
+    },
     { to: `/${culture}/reports`, label: t.nav.reports, icon: FileBarChart },
     {
       to: `/${culture}/organization/units`,

@@ -30,4 +30,75 @@ public interface IResponseRepository : IRepository<ResponseSessionEntity>
 
     /// <summary>تعداد نشست‌های ارسال‌شده‌ی یک نظرسنجی (برای فاز تحلیلات).</summary>
     Task<int> CountSubmittedBySurveyAsync(Guid surveyId, CancellationToken ct = default);
+
+    /// <summary>
+    /// همه‌ی نشست‌های ارسال‌شده‌ی یک نظرسنجی به‌همراه پاسخ‌ها و گزینه‌های انتخابی.
+    /// این متد فقط برای <b>ماژول تحلیلات</b> است تا تجمع‌ها را روی پاسخ‌های خام
+    /// محاسبه کند. مرز ماژول‌ها از طریق همین قرارداد رعایت می‌شود.
+    /// </summary>
+    /// <param name="surveyId">شناسه‌ی نظرسنجی.</param>
+    /// <param name="fromUtc">فیلتر شامل‌شدن بر اساس زمان ارسال (اختیاری).</param>
+    /// <param name="toUtc">فیلتر شامل‌شدن بر اساس زمان ارسال (اختیاری).</param>
+    /// <param name="ct">توکن لغو.</param>
+    Task<IReadOnlyList<ResponseSessionEntity>> ListSubmittedBySurveyAsync(
+        Guid surveyId,
+        DateTime? fromUtc = null,
+        DateTime? toUtc = null,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// همه‌ی نشست‌های ارسال‌شده‌ی چند نظرسنجی (برای داشبورد و روند زمانی تحلیلات).
+    /// فقط فیلدهای مورد نیاز تجمع را به‌صورت بدنه (projection) برمی‌گرداند تا
+    /// پاسخ‌های خام و داده‌های هویتی جابه‌جا نشوند. بخش‌بندی سازمانی از طریق
+    /// <see cref="SubmittedSessionSummary.RespondentEmployeeId"/> و قراردادهای
+    /// ماژول سازمان حل می‌شود.
+    /// </summary>
+    Task<IReadOnlyList<SubmittedSessionSummary>> ListSubmittedAsync(
+        IReadOnlyCollection<Guid> surveyIds,
+        DateTime? fromUtc = null,
+        DateTime? toUtc = null,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// همه‌ی نشست‌های یک نظرسنجی (شامل نشست‌های در حال تکمیل و ارسال‌شده) بدون
+    /// پاسخ‌ها. این متد فقط برای <b>ماژول تحلیلات</b> است تا مخرج نرخ تکمیل را
+    /// تشکیل دهد: نشست‌هایی که شروع شده‌اند ولی هنوز ارسال نشده‌اند، افت پاسخ
+    /// کامل را نشان می‌دهند. مرز ماژول‌ها از طریق همین قرارداد رعایت می‌شود.
+    /// </summary>
+    /// <param name="surveyId">شناسه‌ی نظرسنجی.</param>
+    /// <param name="fromUtc">فیلتر شامل‌شدن بر اساس زمان شروع (اختیاری).</param>
+    /// <param name="toUtc">فیلتر شامل‌شدن بر اساس زمان شروع (اختیاری).</param>
+    /// <param name="ct">توکن لغو.</param>
+    Task<IReadOnlyList<ResponseSessionEntity>> ListAllBySurveyAsync(
+        Guid surveyId,
+        DateTime? fromUtc = null,
+        DateTime? toUtc = null,
+        CancellationToken ct = default);
+}
+
+/// <summary>
+/// خلاصه‌ی یک نشست ارسال‌شده برای تحلیلات — بدون هیچ داده‌ی هویتی مستقیم پاسخ‌گو.
+/// این DTO فقط فیلدهای تجمعی و <see cref="RespondentEmployeeId"/> (برای حل
+/// بخش‌بندی سازمانی از طریق قراردادهای ماژول سازمان) را حمل می‌کند.
+/// </summary>
+public sealed record SubmittedSessionSummary
+{
+    public Guid SessionId { get; init; }
+    public Guid SurveyId { get; init; }
+    public Guid? CampaignId { get; init; }
+
+    /// <summary>زمان ارسال (برای روند زمانی).</summary>
+    public DateTime SubmittedAt { get; init; }
+
+    /// <summary>زمان شروع (برای محاسبه‌ی مدت پاسخ‌گویی).</summary>
+    public DateTime StartedAt { get; init; }
+
+    /// <summary>شناسه‌ی کارمند پاسخ‌گو — فقط برای نظرسنجی‌های غیرناشناس (در ناشناس <c>null</c>).</summary>
+    public Guid? RespondentEmployeeId { get; init; }
+
+    /// <summary>کانال ورود پاسخ.</summary>
+    public ODCC.Domain.Modules.Response.Enums.ResponseSource Source { get; init; }
+
+    /// <summary>تعداد پاسخ‌های دارای مقدار.</summary>
+    public int AnswerCount { get; init; }
 }

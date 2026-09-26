@@ -15,6 +15,7 @@ using ODCC.Application.Modules.Questionnaire.Abstractions;
 using ODCC.Application.Modules.Survey.Abstractions;
 using ODCC.Application.Modules.Campaign.Abstractions;
 using ODCC.Application.Modules.Response.Abstractions;
+using ODCC.Application.Modules.Analytics.Abstractions;
 using ODCC.Infrastructure.Modules.Audit.EventListeners;
 using ODCC.Infrastructure.Modules.Identity;
 using ODCC.Infrastructure.Modules.Identity.Entities;
@@ -44,6 +45,10 @@ using ODCC.Infrastructure.Modules.Response.EventListeners;
 using ODCC.Infrastructure.Modules.Response.Persistence;
 using ODCC.Infrastructure.Modules.Response.Repositories;
 using ODCC.Infrastructure.Modules.Response.Services;
+using ODCC.Infrastructure.Modules.Analytics.EventListeners;
+using ODCC.Infrastructure.Modules.Analytics.Persistence;
+using ODCC.Infrastructure.Modules.Analytics.Repositories;
+using ODCC.Infrastructure.Modules.Analytics.Services;
 using ODCC.Infrastructure.Persistence;
 using ODCC.Infrastructure.Persistence.Audit;
 using ODCC.Infrastructure.Repositories.Audit;
@@ -124,6 +129,15 @@ public static class DependencyInjection
         services.AddScoped<IDomainEventListener<Domain.Modules.Response.Events.ResponseSubmittedEvent>, ResponseAuditEventListener>();
         services.AddScoped<IDomainEventListener<Domain.Modules.Response.Events.ResponseSubmittedEvent>, CampaignResponseEventListener>();
 
+        // شنونده‌ی تحلیلات: پس از هر ارسال پاسخ، عکس‌العمل تحلیلات نظرسنجی
+        // به‌روزرسانی می‌شود تا داشبوردها به‌روز بمانند. این شنونده در ماژول
+        // تحلیلات ثبت می‌شود چون تغییر روی موجودیت‌های تحلیلات است، ولی به
+        // رویداد ماژول پاسخ‌ها گوش می‌دهد.
+        services.AddScoped<IDomainEventListener<Domain.Modules.Response.Events.ResponseSubmittedEvent>, AnalyticsResponseEventListener>();
+
+        // شنونده‌ی ممیزی برای رویدادهای تحلیلات.
+        services.AddScoped<IDomainEventListener<Domain.Modules.Analytics.Events.AnalyticsComputedEvent>, AnalyticsAuditEventListener>();
+
         ConfigureAudit(services, connectionString, configure);
         ConfigureIdentity(services, connectionString, configure);
         ConfigureOrganization(services, connectionString, configure);
@@ -132,6 +146,7 @@ public static class DependencyInjection
         ConfigureSurvey(services, connectionString, configure);
         ConfigureCampaign(services, connectionString, configure);
         ConfigureResponse(services, connectionString, configure);
+        ConfigureAnalytics(services, connectionString, configure);
 
         return services;
     }
@@ -365,6 +380,27 @@ public static class DependencyInjection
         services.AddScoped<IResponseRepository, ResponseRepository>();
         services.AddScoped<IResponseService, ResponseService>();
         services.AddScoped<IResponseUnitOfWork, ResponseUnitOfWork>();
+    }
+
+    // --- ماژول تحلیلات -----------------------------------------------------
+
+    private static void ConfigureAnalytics(
+        IServiceCollection services,
+        string connectionString,
+        Action<DbContextOptionsBuilder>? configure)
+    {
+        services.AddDbContext<AnalyticsDbContext>(options =>
+        {
+            ConfigureSql(options, connectionString);
+            configure?.Invoke(options);
+        });
+
+        services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();
+        services.AddScoped<IBenchmarkRepository, BenchmarkRepository>();
+        services.AddScoped<IAnalyticsService, AnalyticsService>();
+        services.AddScoped<IBenchmarkService, BenchmarkService>();
+        services.AddScoped<AnalyticsComputationEngine>();
+        services.AddScoped<IAnalyticsUnitOfWork, AnalyticsUnitOfWork>();
     }
 
     private static void ConfigureSql(DbContextOptionsBuilder options, string connectionString)

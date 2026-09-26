@@ -40,6 +40,11 @@ export const Permissions = {
   Response: {
     View: 'responses.view',
     Export: 'responses.export'
+  },
+  Analytics: {
+    View: 'analytics.view',
+    DepartmentView: 'analytics.department.view',
+    CompanyView: 'analytics.company.view'
   }
 } as const;
 
