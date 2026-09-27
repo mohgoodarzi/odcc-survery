@@ -45,6 +45,10 @@ export const Permissions = {
     View: 'analytics.view',
     DepartmentView: 'analytics.department.view',
     CompanyView: 'analytics.company.view'
+  },
+  Reports: {
+    View: 'reports.view',
+    Export: 'reports.export'
   }
 } as const;
 

@@ -17,6 +17,7 @@ using ODCC.Application.Modules.Survey.Abstractions;
 using ODCC.Application.Modules.Campaign.Abstractions;
 using ODCC.Application.Modules.Response.Abstractions;
 using ODCC.Application.Modules.Analytics.Abstractions;
+using ODCC.Application.Modules.Reporting.Abstractions;
 using ODCC.Infrastructure.Modules.Audit.EventListeners;
 using ODCC.Infrastructure.Repositories.Audit;
 using ODCC.Infrastructure.Modules.Identity;
@@ -48,6 +49,10 @@ using ODCC.Infrastructure.Modules.Analytics.EventListeners;
 using ODCC.Infrastructure.Modules.Analytics.Persistence;
 using ODCC.Infrastructure.Modules.Analytics.Repositories;
 using ODCC.Infrastructure.Modules.Analytics.Services;
+using ODCC.Infrastructure.Modules.Reporting.EventListeners;
+using ODCC.Infrastructure.Modules.Reporting.Persistence;
+using ODCC.Infrastructure.Modules.Reporting.Repositories;
+using ODCC.Infrastructure.Modules.Reporting.Services;
 using ODCC.Infrastructure.Modules.Organization.Persistence;
 using ODCC.Infrastructure.Modules.Organization.Repositories;
 using ODCC.Infrastructure.Modules.Organization.Services;
@@ -77,6 +82,7 @@ public sealed class TestEnvironment : IAsyncDisposable
     public CampaignDbContext CampaignDbContext { get; }
     public ResponseDbContext ResponseDbContext { get; }
     public AnalyticsDbContext AnalyticsDbContext { get; }
+    public ReportingDbContext ReportingDbContext { get; }
 
     private readonly SqliteConnection _identityConnection;
     private readonly SqliteConnection _organizationConnection;
@@ -87,6 +93,7 @@ public sealed class TestEnvironment : IAsyncDisposable
     private readonly SqliteConnection _campaignConnection;
     private readonly SqliteConnection _responseConnection;
     private readonly SqliteConnection _analyticsConnection;
+    private readonly SqliteConnection _reportingConnection;
 
     private TestEnvironment(
         IServiceProvider services,
@@ -98,6 +105,7 @@ public sealed class TestEnvironment : IAsyncDisposable
         CampaignDbContext campaignDbContext,
         ResponseDbContext responseDbContext,
         AnalyticsDbContext analyticsDbContext,
+        ReportingDbContext reportingDbContext,
         SqliteConnection identityConnection,
         SqliteConnection organizationConnection,
         SqliteConnection auditConnection,
@@ -106,7 +114,8 @@ public sealed class TestEnvironment : IAsyncDisposable
         SqliteConnection surveyConnection,
         SqliteConnection campaignConnection,
         SqliteConnection responseConnection,
-        SqliteConnection analyticsConnection)
+        SqliteConnection analyticsConnection,
+        SqliteConnection reportingConnection)
     {
         Services = services;
         IdentityDbContext = identityDbContext;
@@ -117,6 +126,7 @@ public sealed class TestEnvironment : IAsyncDisposable
         CampaignDbContext = campaignDbContext;
         ResponseDbContext = responseDbContext;
         AnalyticsDbContext = analyticsDbContext;
+        ReportingDbContext = reportingDbContext;
         _identityConnection = identityConnection;
         _organizationConnection = organizationConnection;
         _auditConnection = auditConnection;
@@ -126,6 +136,7 @@ public sealed class TestEnvironment : IAsyncDisposable
         _campaignConnection = campaignConnection;
         _responseConnection = responseConnection;
         _analyticsConnection = analyticsConnection;
+        _reportingConnection = reportingConnection;
     }
 
     /// <summary>
@@ -161,7 +172,14 @@ public sealed class TestEnvironment : IAsyncDisposable
         var analyticsConnection = new SqliteConnection("DataSource=:memory:");
         await analyticsConnection.OpenAsync();
 
+        var reportingConnection = new SqliteConnection("DataSource=:memory:");
+        await reportingConnection.OpenAsync();
+
         var services = new ServiceCollection();
+
+        // QuestPDF نیازمند اعلام نوع مجوز در زمان شروع است. در آزمون‌ها از
+        // مجوز Community استفاده می‌شود (محیط غیرتولیدی).
+        global::QuestPDF.Settings.License = global::QuestPDF.Infrastructure.LicenseType.Community;
 
         services.AddLogging();
         services.AddHttpContextAccessor();
@@ -192,6 +210,9 @@ public sealed class TestEnvironment : IAsyncDisposable
 
         services.AddDbContext<AnalyticsDbContext>(options =>
             options.UseSqlite(analyticsConnection));
+
+        services.AddDbContext<ReportingDbContext>(options =>
+            options.UseSqlite(reportingConnection));
 
         services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
             {
@@ -252,6 +273,13 @@ public sealed class TestEnvironment : IAsyncDisposable
         services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Response.Events.ResponseSubmittedEvent>, CampaignResponseEventListener>();
         services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Response.Events.ResponseSubmittedEvent>, AnalyticsResponseEventListener>();
         services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Analytics.Events.AnalyticsComputedEvent>, AnalyticsAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Reporting.Events.ReportCreatedEvent>, ReportingAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Reporting.Events.ReportUpdatedEvent>, ReportingAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Reporting.Events.ReportActivatedEvent>, ReportingAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Reporting.Events.ReportArchivedEvent>, ReportingAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Reporting.Events.ReportExecutionStartedEvent>, ReportingAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Reporting.Events.ReportExecutionSucceededEvent>, ReportingAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Reporting.Events.ReportExecutionFailedEvent>, ReportingAuditEventListener>();
         services.AddScoped<IAuditEntryRepository, AuditEntryRepository>();
         services.AddScoped<IAuditService, AuditService>();
         services.AddScoped<IRefreshTokenStore, RefreshTokenStore>();
@@ -264,6 +292,7 @@ public sealed class TestEnvironment : IAsyncDisposable
         services.AddScoped<ICampaignUnitOfWork, CampaignUnitOfWork>();
         services.AddScoped<IResponseUnitOfWork, ResponseUnitOfWork>();
         services.AddScoped<IAnalyticsUnitOfWork, AnalyticsUnitOfWork>();
+        services.AddScoped<IReportingUnitOfWork, ReportingUnitOfWork>();
 
         services.AddScoped<IOrgUnitRepository, OrgUnitRepository>();
         services.AddScoped<IPositionRepository, PositionRepository>();
@@ -296,6 +325,17 @@ public sealed class TestEnvironment : IAsyncDisposable
         services.AddScoped<IAnalyticsService, AnalyticsService>();
         services.AddScoped<IBenchmarkService, BenchmarkService>();
 
+        // ماژول گزارش‌گیری: رندرها، انبار فایل موقت و جمع‌آوری داده.
+        services.AddScoped<IReportDefinitionRepository, ReportDefinitionRepository>();
+        services.AddScoped<IReportExecutionRepository, ReportExecutionRepository>();
+        services.AddScoped<IReportingService, ReportingService>();
+        services.AddScoped<IReportDataAssembler, ReportDataAssembler>();
+        services.AddScoped<IReportRenderer, ExcelReportRenderer>();
+        services.AddScoped<IReportRenderer, PdfReportRenderer>();
+
+        // انبار فایل گزارش در آزمون: شاخه‌ی موقت که در پایان آزمون پاک می‌شود.
+        services.AddSingleton<IReportArtifactStore, TempDirectoryReportArtifactStore>();
+
         // پیاده‌سازی پیش‌فرض و بدون اثر هوش مصنوعی — هیچ داده‌ای از سامانه خارج نمی‌شود.
         services.AddSingleton<IAnalyticsAiService, NoOpAnalyticsAiService>();
 
@@ -324,6 +364,7 @@ public sealed class TestEnvironment : IAsyncDisposable
         var campaignDbContext = provider.GetRequiredService<CampaignDbContext>();
         var responseDbContext = provider.GetRequiredService<ResponseDbContext>();
         var analyticsDbContext = provider.GetRequiredService<AnalyticsDbContext>();
+        var reportingDbContext = provider.GetRequiredService<ReportingDbContext>();
 
         await identityDbContext.Database.EnsureCreatedAsync();
         await organizationDbContext.Database.EnsureCreatedAsync();
@@ -334,13 +375,14 @@ public sealed class TestEnvironment : IAsyncDisposable
         await campaignDbContext.Database.EnsureCreatedAsync();
         await responseDbContext.Database.EnsureCreatedAsync();
         await analyticsDbContext.Database.EnsureCreatedAsync();
+        await reportingDbContext.Database.EnsureCreatedAsync();
 
         return new TestEnvironment(provider, identityDbContext, organizationDbContext,
             questionBankDbContext, questionnaireDbContext, surveyDbContext, campaignDbContext,
-            responseDbContext, analyticsDbContext,
+            responseDbContext, analyticsDbContext, reportingDbContext,
             identityConnection, organizationConnection, auditConnection,
             questionBankConnection, questionnaireConnection, surveyConnection, campaignConnection,
-            responseConnection, analyticsConnection);
+            responseConnection, analyticsConnection, reportingConnection);
     }
 
     /// <summary>
@@ -445,6 +487,7 @@ public sealed class TestEnvironment : IAsyncDisposable
         await CampaignDbContext.DisposeAsync();
         await ResponseDbContext.DisposeAsync();
         await AnalyticsDbContext.DisposeAsync();
+        await ReportingDbContext.DisposeAsync();
         await _identityConnection.DisposeAsync();
         await _organizationConnection.DisposeAsync();
         await _auditConnection.DisposeAsync();
@@ -454,6 +497,7 @@ public sealed class TestEnvironment : IAsyncDisposable
         await _campaignConnection.DisposeAsync();
         await _responseConnection.DisposeAsync();
         await _analyticsConnection.DisposeAsync();
+        await _reportingConnection.DisposeAsync();
         if (Services is IDisposable disposable)
         {
             disposable.Dispose();
@@ -480,4 +524,77 @@ public sealed class TestCurrentUserService : ICurrentUserService
     public bool IsInRole(params string[] roles) => roles.Any(r => Roles.Contains(r));
     public bool HasPermission(string permission) => Permissions.Contains(permission);
     public bool HasPermission(Permissions.PermissionKey permission) => HasPermission(permission.Value);
+}
+
+/// <summary>
+/// انبار فایل خروجی گزارش برای آزمون‌ها: یک شاخسه‌ی موقت اختصاصی می‌سازد که
+/// در زمان Dispose از روی دیسک پاک می‌شود. هیچ فایلی خارج از مسیر موقت
+/// نوشته نمی‌شود.
+/// </summary>
+internal sealed class TempDirectoryReportArtifactStore : IReportArtifactStore
+{
+    private readonly string _root = Path.Combine(Path.GetTempPath(), "odcc-report-artifacts-" + Guid.NewGuid().ToString("N"));
+
+    public Task<StoredArtifact> SaveAsync(Stream content, string fileName, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
+
+        var relativePath = Path.Combine(DateTime.UtcNow.ToString("yyyy-MM", System.Globalization.CultureInfo.InvariantCulture), fileName);
+        var absolutePath = ToAbsolutePath(relativePath);
+
+        Directory.CreateDirectory(Path.GetDirectoryName(absolutePath)!);
+
+        using var fileStream = new FileStream(absolutePath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+        content.CopyTo(fileStream);
+
+        return Task.FromResult(new StoredArtifact(Normalize(relativePath), fileStream.Length));
+    }
+
+    public Task<Stream> OpenReadAsync(string relativePath, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
+
+        Stream stream = new FileStream(ToAbsolutePath(relativePath), FileMode.Open, FileAccess.Read, FileShare.Read);
+
+        return Task.FromResult(stream);
+    }
+
+    public Task DeleteAsync(string relativePath, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
+
+        var absolutePath = ToAbsolutePath(relativePath);
+
+        if (File.Exists(absolutePath))
+        {
+            File.Delete(absolutePath);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public bool Exists(string relativePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
+
+        return File.Exists(ToAbsolutePath(relativePath));
+    }
+
+    private string ToAbsolutePath(string relativePath)
+    {
+        var absolute = Path.Combine(_root, relativePath.TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+
+        // جلوگیری از خروج مسیر از ریشه (path traversal).
+        var fullRoot = Path.GetFullPath(_root);
+        var fullPath = Path.GetFullPath(absolute);
+
+        if (!fullPath.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new UnauthorizedAccessException("مسیر فایل گزارش خارج از شاخسه‌ی مجاز است.");
+        }
+
+        return fullPath;
+    }
+
+    private static string Normalize(string relativePath) => relativePath.Replace('\\', '/');
 }

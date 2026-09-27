@@ -641,4 +641,95 @@ export interface Dictionary {
     errorQuestionnaireNotAvailable: string;
     errorRequiredQuestions: string;
   };
+  reports: {
+    title: string;
+    description: string;
+    /** تعریف گزارش. */
+    newReport: string;
+    editReport: string;
+    reportName: string;
+    reportDescription: string;
+    reportType: string;
+    reportFormat: string;
+    reportSchedule: string;
+    survey: string;
+    selectSurvey: string;
+    windowFrom: string;
+    windowTo: string;
+    orgUnit: string;
+    includeDescendants: string;
+    retentionCount: string;
+    retentionCountHint: string;
+    activateImmediately: string;
+    activateImmediatelyHint: string;
+    owner: string;
+    nextRunAt: string;
+    lastExecutedAt: string;
+    lastSuccessAt: string;
+    searchPlaceholder: string;
+    noReports: string;
+    noReportsDescription: string;
+    /** انواع گزارش. */
+    typeSurveyAnalytics: string;
+    typeDashboardSummary: string;
+    typeBenchmarkComparison: string;
+    /** قالب‌ها. */
+    formatPdf: string;
+    formatExcel: string;
+    /** زمان‌بندی. */
+    scheduleOneTime: string;
+    scheduleDaily: string;
+    scheduleWeekly: string;
+    scheduleMonthly: string;
+    /** وضعیت‌های چرخه‌ی عمر. */
+    statusDraft: string;
+    statusActive: string;
+    statusArchived: string;
+    includeArchived: string;
+    /** اکشن‌ها. */
+    execute: string;
+    executing: string;
+    executeHint: string;
+    activate: string;
+    archive: string;
+    download: string;
+    downloadHint: string;
+    reportCreated: string;
+    reportUpdated: string;
+    reportActivated: string;
+    reportArchived: string;
+    reportExecuted: string;
+    archiveConfirmTitle: string;
+    archiveConfirmDescription: string;
+    executeConfirmTitle: string;
+    executeConfirmDescription: string;
+    /** تاریخچه‌ی اجرا. */
+    executions: string;
+    executionsDescription: string;
+    executionStatus: string;
+    executionReportName: string;
+    queuedAt: string;
+    startedAt: string;
+    completedAt: string;
+    duration: string;
+    triggeredBy: string;
+    automaticScheduler: string;
+    fileName: string;
+    fileSize: string;
+    rowCount: string;
+    errorMessage: string;
+    noExecutions: string;
+    noExecutionsDescription: string;
+    statusPending: string;
+    statusRunning: string;
+    statusSucceeded: string;
+    statusFailed: string;
+    /** کدهای خطای سمت سرور. */
+    errorReportNotFound: string;
+    errorReportArchived: string;
+    errorArtifactUnavailable: string;
+    errorArtifactMissing: string;
+    /** حریم خصوصی. */
+    privacyNote: string;
+  };
 }

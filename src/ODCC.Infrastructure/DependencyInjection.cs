@@ -16,6 +16,7 @@ using ODCC.Application.Modules.Survey.Abstractions;
 using ODCC.Application.Modules.Campaign.Abstractions;
 using ODCC.Application.Modules.Response.Abstractions;
 using ODCC.Application.Modules.Analytics.Abstractions;
+using ODCC.Application.Modules.Reporting.Abstractions;
 using ODCC.Infrastructure.Modules.Audit.EventListeners;
 using ODCC.Infrastructure.Modules.Identity;
 using ODCC.Infrastructure.Modules.Identity.Entities;
@@ -49,6 +50,11 @@ using ODCC.Infrastructure.Modules.Analytics.EventListeners;
 using ODCC.Infrastructure.Modules.Analytics.Persistence;
 using ODCC.Infrastructure.Modules.Analytics.Repositories;
 using ODCC.Infrastructure.Modules.Analytics.Services;
+using ODCC.Infrastructure.Modules.Reporting.EventListeners;
+using ODCC.Infrastructure.Modules.Reporting.Persistence;
+using ODCC.Infrastructure.Modules.Reporting.Repositories;
+using ODCC.Infrastructure.Modules.Reporting.Scheduled;
+using ODCC.Infrastructure.Modules.Reporting.Services;
 using ODCC.Infrastructure.Persistence;
 using ODCC.Infrastructure.Persistence.Audit;
 using ODCC.Infrastructure.Repositories.Audit;
@@ -138,6 +144,17 @@ public static class DependencyInjection
         // شنونده‌ی ممیزی برای رویدادهای تحلیلات.
         services.AddScoped<IDomainEventListener<Domain.Modules.Analytics.Events.AnalyticsComputedEvent>, AnalyticsAuditEventListener>();
 
+        // شنونده‌ی ممیزی برای رویدادهای گزارش‌گیری: ایجاد، ویرایش، فعال‌سازی،
+        // بایگانی و اجرای گزارش‌ها. این شنونده در ماژول گزارش‌گیری ثبت می‌شود
+        // چون تغییر روی موجودیت‌های این ماژول است، ولی به رویدادهای خودش گوش می‌دهد.
+        services.AddScoped<IDomainEventListener<Domain.Modules.Reporting.Events.ReportCreatedEvent>, ReportingAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Reporting.Events.ReportUpdatedEvent>, ReportingAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Reporting.Events.ReportActivatedEvent>, ReportingAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Reporting.Events.ReportArchivedEvent>, ReportingAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Reporting.Events.ReportExecutionStartedEvent>, ReportingAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Reporting.Events.ReportExecutionSucceededEvent>, ReportingAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Reporting.Events.ReportExecutionFailedEvent>, ReportingAuditEventListener>();
+
         ConfigureAudit(services, connectionString, configure);
         ConfigureIdentity(services, connectionString, configure);
         ConfigureOrganization(services, connectionString, configure);
@@ -147,6 +164,52 @@ public static class DependencyInjection
         ConfigureCampaign(services, connectionString, configure);
         ConfigureResponse(services, connectionString, configure);
         ConfigureAnalytics(services, connectionString, configure);
+        ConfigureReporting(services, connectionString, configure);
+
+        return services;
+    }
+
+    /// <summary>
+    /// راه‌اندازی بخش پیکربندی ماژول گزارش‌گیری: گزینه‌های انبار فایل،
+    /// فونت فارسی رندر PDF و (در صورت تأیید) زمان‌بند اجرای خودکار.
+    ///
+    /// طبق سیاست پروژه، اجرای خودکار یک اثر جانبی است و فقط با تأیید صریح
+    /// (<c>Reports:EnableScheduler</c>) فعال می‌شود.
+    /// </summary>
+    public static IServiceCollection AddOdccReporting(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<ReportSchedulerOptions>(configuration.GetSection(ReportSchedulerOptions.SectionName));
+        services.Configure<ReportArtifactOptions>(configuration.GetSection(ReportArtifactOptions.SectionName));
+
+        // QuestPDF نیازمند اعلام نوع مجوز در زمان بوت است. بدون این پیکربندی،
+        // اولین رندر PDF با استثنا شکست می‌خورد. مجوز Community برای استفاده‌ی
+        // داخلی این سامانه کافی است؛ کلید مجوز تجاری (در صورت نیاز) از
+        // پیکربندی و بدون ذخیره در کد خوانده می‌شود.
+        var licenseKey = configuration[$"{ReportArtifactOptions.SectionName}:QuestPdfLicenseKey"];
+        global::QuestPDF.Settings.License = string.IsNullOrWhiteSpace(licenseKey)
+            ? global::QuestPDF.Infrastructure.LicenseType.Community
+            : global::QuestPDF.Infrastructure.LicenseType.Professional;
+
+        // فونت فارسی برای رندر PDF یک‌بار در زمان بوت بارگذاری می‌شود.
+        // فونت همراه QuestPDF (Lato) گلیف‌های فارسی ندارد.
+        var artifactOptions = configuration.GetSection(ReportArtifactOptions.SectionName)
+            .Get<ReportArtifactOptions>() ?? new ReportArtifactOptions();
+
+        var resolvedFamily = ReportFontLoader.Initialize(artifactOptions.PersianFontPath);
+
+        if (ReportFontLoader.UsedFallback)
+        {
+            Console.WriteLine(
+                $"هشدار: فونت فارسی برای گزارش‌های PDF یافت نشد (خانواده‌ی «{resolvedFamily}» استفاده می‌شود). " +
+                "متن فارسی در PDF به‌درستی نمایش داده نمی‌شود. مسیر فونت را با Reports:PersianFontPath مشخص کنید.");
+        }
+
+        var enableScheduler = configuration.GetValue<bool?>($"{ReportSchedulerOptions.SectionName}:EnableScheduler") is true;
+
+        if (enableScheduler)
+        {
+            services.AddHostedService<ReportSchedulerHostedService>();
+        }
 
         return services;
     }
@@ -401,6 +464,29 @@ public static class DependencyInjection
         services.AddScoped<IBenchmarkService, BenchmarkService>();
         services.AddScoped<AnalyticsComputationEngine>();
         services.AddScoped<IAnalyticsUnitOfWork, AnalyticsUnitOfWork>();
+    }
+
+    // --- ماژول گزارش‌گیری --------------------------------------------------
+
+    private static void ConfigureReporting(
+        IServiceCollection services,
+        string connectionString,
+        Action<DbContextOptionsBuilder>? configure)
+    {
+        services.AddDbContext<ReportingDbContext>(options =>
+        {
+            ConfigureSql(options, connectionString);
+            configure?.Invoke(options);
+        });
+
+        services.AddScoped<IReportDefinitionRepository, ReportDefinitionRepository>();
+        services.AddScoped<IReportExecutionRepository, ReportExecutionRepository>();
+        services.AddScoped<IReportingService, ReportingService>();
+        services.AddScoped<IReportDataAssembler, ReportDataAssembler>();
+        services.AddScoped<IReportRenderer, ExcelReportRenderer>();
+        services.AddScoped<IReportRenderer, PdfReportRenderer>();
+        services.AddSingleton<IReportArtifactStore, FileSystemReportArtifactStore>();
+        services.AddScoped<IReportingUnitOfWork, ReportingUnitOfWork>();
     }
 
     private static void ConfigureSql(DbContextOptionsBuilder options, string connectionString)

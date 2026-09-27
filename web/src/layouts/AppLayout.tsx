@@ -61,7 +61,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
       icon: BarChart3,
       permissions: [Permissions.Analytics.View]
     },
-    { to: `/${culture}/reports`, label: t.nav.reports, icon: FileBarChart },
+    {
+      to: `/${culture}/reports`,
+      label: t.nav.reports,
+      icon: FileBarChart,
+      permissions: [Permissions.Reports.View]
+    },
     {
       to: `/${culture}/organization/units`,
       label: t.nav.orgUnits,

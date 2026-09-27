@@ -8,6 +8,7 @@ using ODCC.Infrastructure.Modules.Survey.Persistence;
 using ODCC.Infrastructure.Modules.Campaign.Persistence;
 using ODCC.Infrastructure.Modules.Response.Persistence;
 using ODCC.Infrastructure.Modules.Analytics.Persistence;
+using ODCC.Infrastructure.Modules.Reporting.Persistence;
 using ODCC.Infrastructure.Persistence.Common;
 
 namespace ODCC.Infrastructure.Persistence;
@@ -149,3 +150,9 @@ public sealed class ResponseUnitOfWork(ResponseDbContext context, IDomainEventDi
 /// </summary>
 public sealed class AnalyticsUnitOfWork(AnalyticsDbContext context, IDomainEventDispatcher domainEventDispatcher)
     : UnitOfWork<AnalyticsDbContext>(context, domainEventDispatcher), IAnalyticsUnitOfWork;
+
+/// <summary>
+/// مرز تراکنشی ماژول گزارش‌گیری.
+/// </summary>
+public sealed class ReportingUnitOfWork(ReportingDbContext context, IDomainEventDispatcher domainEventDispatcher)
+    : UnitOfWork<ReportingDbContext>(context, domainEventDispatcher), IReportingUnitOfWork;

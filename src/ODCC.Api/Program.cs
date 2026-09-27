@@ -29,6 +29,7 @@ using ODCC.Infrastructure.Modules.Survey.Persistence;
 using ODCC.Infrastructure.Modules.Campaign.Persistence;
 using ODCC.Infrastructure.Modules.Response.Persistence;
 using ODCC.Infrastructure.Modules.Analytics.Persistence;
+using ODCC.Infrastructure.Modules.Reporting.Persistence;
 using ODCC.Infrastructure.Persistence.Audit;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -40,6 +41,7 @@ var connectionString = builder.Configuration.GetConnectionString("Default");
 // پایگاه داده هم بوت شود. به‌محض فعال‌سازی Database:AutoMigrate بررسی می‌شود.
 builder.Services.AddOdccInfrastructure(connectionString ?? string.Empty);
 builder.Services.AddOdccApplication();
+builder.Services.AddOdccReporting(builder.Configuration);
 builder.Services.AddOdccDatabaseInitializer(builder.Configuration);
 
 // ---- احراز هویت و مجوزدهی -----------------------------------------------
@@ -157,7 +159,8 @@ builder.Services.AddHealthChecks()
     .AddDbContextCheck<SurveyDbContext>("sql-server-survey")
     .AddDbContextCheck<CampaignDbContext>("sql-server-campaign")
     .AddDbContextCheck<ResponseDbContext>("sql-server-response")
-    .AddDbContextCheck<AnalyticsDbContext>("sql-server-analytics");
+    .AddDbContextCheck<AnalyticsDbContext>("sql-server-analytics")
+    .AddDbContextCheck<ReportingDbContext>("sql-server-reporting");
 
 var app = builder.Build();
 
