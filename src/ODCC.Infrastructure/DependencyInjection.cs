@@ -1,9 +1,11 @@
 using System.Text;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using ODCC.Application.Abstractions;
 using ODCC.Application.Authorization;
@@ -17,6 +19,7 @@ using ODCC.Application.Modules.Campaign.Abstractions;
 using ODCC.Application.Modules.Response.Abstractions;
 using ODCC.Application.Modules.Analytics.Abstractions;
 using ODCC.Application.Modules.Reporting.Abstractions;
+using ODCC.Application.Modules.Notification.Abstractions;
 using ODCC.Infrastructure.Modules.Audit.EventListeners;
 using ODCC.Infrastructure.Modules.Identity;
 using ODCC.Infrastructure.Modules.Identity.Entities;
@@ -41,6 +44,7 @@ using ODCC.Infrastructure.Modules.Survey.Services;
 using ODCC.Infrastructure.Modules.Campaign.EventListeners;
 using ODCC.Infrastructure.Modules.Campaign.Persistence;
 using ODCC.Infrastructure.Modules.Campaign.Repositories;
+using ODCC.Infrastructure.Modules.Campaign.Scheduled;
 using ODCC.Infrastructure.Modules.Campaign.Services;
 using ODCC.Infrastructure.Modules.Response.EventListeners;
 using ODCC.Infrastructure.Modules.Response.Persistence;
@@ -55,6 +59,11 @@ using ODCC.Infrastructure.Modules.Reporting.Persistence;
 using ODCC.Infrastructure.Modules.Reporting.Repositories;
 using ODCC.Infrastructure.Modules.Reporting.Scheduled;
 using ODCC.Infrastructure.Modules.Reporting.Services;
+using ODCC.Infrastructure.Modules.Notification.EventListeners;
+using ODCC.Infrastructure.Modules.Notification.Persistence;
+using ODCC.Infrastructure.Modules.Notification.Repositories;
+using ODCC.Infrastructure.Modules.Notification.Scheduled;
+using ODCC.Infrastructure.Modules.Notification.Services;
 using ODCC.Infrastructure.Persistence;
 using ODCC.Infrastructure.Persistence.Audit;
 using ODCC.Infrastructure.Repositories.Audit;
@@ -155,6 +164,21 @@ public static class DependencyInjection
         services.AddScoped<IDomainEventListener<Domain.Modules.Reporting.Events.ReportExecutionSucceededEvent>, ReportingAuditEventListener>();
         services.AddScoped<IDomainEventListener<Domain.Modules.Reporting.Events.ReportExecutionFailedEvent>, ReportingAuditEventListener>();
 
+        // شنونده‌ی ممیزی برای رویدادهای اعلان‌ها: ایجاد، تحویل، شکست و خوانده‌شدن.
+        // این شنونده در ماژول اعلان‌ها ثبت می‌شود چون تغییر روی موجودیت‌های همین
+        // ماژول است، ولی به رویدادهای خودش گوش می‌دهد.
+        services.AddScoped<IDomainEventListener<Domain.Modules.Notification.Events.NotificationCreatedEvent>, NotificationAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Notification.Events.NotificationDeliveredEvent>, NotificationAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Notification.Events.NotificationFailedEvent>, NotificationAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Notification.Events.NotificationReadEvent>, NotificationAuditEventListener>();
+
+        // شنونده‌ی اعلان‌ها: دعوت‌نامه‌ها و یادآورهای کمپین را به پیام واقعی
+        // تبدیل می‌کند. این شنونده در ماژول اعلان‌ها ثبت می‌شود چون موجودیت‌های
+        // ساخته‌شده (Notification) متعلق به این ماژول است، ولی به رویدادهای
+        // ماژول کمپین گوش می‌دهد.
+        services.AddScoped<IDomainEventListener<Domain.Modules.Campaign.Events.CampaignLaunchedEvent>, CampaignNotificationEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Campaign.Events.ReminderDueEvent>, CampaignNotificationEventListener>();
+
         ConfigureAudit(services, connectionString, configure);
         ConfigureIdentity(services, connectionString, configure);
         ConfigureOrganization(services, connectionString, configure);
@@ -165,6 +189,7 @@ public static class DependencyInjection
         ConfigureResponse(services, connectionString, configure);
         ConfigureAnalytics(services, connectionString, configure);
         ConfigureReporting(services, connectionString, configure);
+        ConfigureNotification(services, connectionString, configure);
 
         return services;
     }
@@ -215,11 +240,12 @@ public static class DependencyInjection
     }
 
     /// <summary>
-    /// راه‌اندازی پایگاه داده در زمان بوت.
+    /// راه‌انداز پایگاه داده در زمان بوت.
     ///
-    /// توجه: طبق سیاست امنیتی پروژه، اجرای خودکار مهاجرت‌ها به‌صورت پیش‌فرض
-    /// <b>غیرفعال</b> است (<c>Database:AutoMigrate</c>). فعال‌سازی آن نیازمند
-    /// تأیید صریح شما پیش از ایجاد/تغییر پایگاه داده است.
+    /// سرویس همیشه ثبت می‌شود تا کاشت داده‌ی اولیه (خودتوان و افزودنی) اجرا
+    /// شود. طبق سیاست امنیتی پروژه، <b>مهاجرت</b> خودکار به‌صورت پیش‌فرض
+    /// غیرفعال است (<c>Database:AutoMigrate</c>) و فقط با تأیید صریح شما پیش
+    /// از ایجاد/تغییر پایگاه داده انجام می‌شود.
     /// </summary>
     public static IServiceCollection AddOdccDatabaseInitializer(this IServiceCollection services, IConfiguration configuration)
     {
@@ -228,10 +254,10 @@ public static class DependencyInjection
 
         var autoMigrate = configuration.GetValue<bool?>("Database:AutoMigrate") is true;
 
-        if (autoMigrate)
-        {
-            services.AddHostedService<OdccDbInitializerHostedService>();
-        }
+        services.AddHostedService(sp => new OdccDbInitializerHostedService(
+            sp.GetRequiredService<IServiceScopeFactory>(),
+            autoMigrate,
+            sp.GetRequiredService<ILogger<OdccDbInitializerHostedService>>()));
 
         return services;
     }
@@ -257,6 +283,12 @@ public static class DependencyInjection
 
         var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Secret));
 
+        // AddIdentity (فراخوانی‌شده در AddOdccInfrastructure پیش از این متد) طرح
+        // کوکی ASP.NET Identity را ثبت و DefaultAuthenticateScheme/DefaultChallengeScheme
+        // را روی همان طرح کوکی تنظیم می‌کند. بدون تصحیح زیر، توکن‌های Bearer
+        // معتبر نادیده گرفته می‌شوند و اندپوینت‌های محافظت‌شده به جای ۴۰۱/۴۰۳،
+        // به صفحه‌ی ورود کوکی هدایت می‌شوند. اینجا دوباره طرح JWT را پیش‌فرض
+        // همه‌ی نوع‌های چالش می‌کنیم.
         services.AddAuthentication(authenticationScheme)
             .AddJwtBearer(authenticationScheme, options =>
             {
@@ -272,6 +304,19 @@ public static class DependencyInjection
                     ClockSkew = TimeSpan.FromMinutes(1)
                 };
             });
+
+        // AddIdentity، DefaultAuthenticateScheme و DefaultChallengeScheme را روی
+        // طرح کوکی خود تنظیم کرده است. AddAuthentication(scheme) در بالا تنها
+        // DefaultScheme را می‌نویسد و کافی نیست؛ طرح‌های پیش‌فرض باید صریحاً
+        // دوباره روی Bearer تنظیم شوند.
+        services.Configure<AuthenticationOptions>(options =>
+        {
+            options.DefaultAuthenticateScheme = authenticationScheme;
+            options.DefaultChallengeScheme = authenticationScheme;
+            options.DefaultForbidScheme = authenticationScheme;
+            options.DefaultSignInScheme = authenticationScheme;
+            options.DefaultSignOutScheme = authenticationScheme;
+        });
 
         return services;
     }
@@ -487,6 +532,92 @@ public static class DependencyInjection
         services.AddScoped<IReportRenderer, PdfReportRenderer>();
         services.AddSingleton<IReportArtifactStore, FileSystemReportArtifactStore>();
         services.AddScoped<IReportingUnitOfWork, ReportingUnitOfWork>();
+    }
+
+    // --- ماژول اعلان‌ها ----------------------------------------------------
+
+    private static void ConfigureNotification(
+        IServiceCollection services,
+        string connectionString,
+        Action<DbContextOptionsBuilder>? configure)
+    {
+        services.AddDbContext<NotificationDbContext>(options =>
+        {
+            ConfigureSql(options, connectionString);
+            configure?.Invoke(options);
+        });
+
+        services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<INotificationTemplateRepository, NotificationTemplateRepository>();
+        services.AddScoped<INotificationPreferenceRepository, NotificationPreferenceRepository>();
+
+        services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<INotificationTemplateService, NotificationTemplateService>();
+        services.AddScoped<INotificationPreferenceService, NotificationPreferenceService>();
+        services.AddScoped<INotificationTemplateRenderer, NotificationTemplateRenderer>();
+        services.AddScoped<INotificationRecipientResolver, NotificationRecipientResolver>();
+        services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
+
+        // ارائه‌دهنده‌های تحویل: یکی به ازای هر کانال. افزودن کانال جدید فقط
+        // پیاده‌سازی INotificationDeliveryProvider و ثبت آن در DI است.
+        services.AddScoped<INotificationDeliveryProvider, InAppNotificationProvider>();
+        services.AddScoped<INotificationDeliveryProvider, EmailNotificationProvider>();
+        services.AddScoped<INotificationDeliveryProvider, SmsNotificationProvider>();
+
+        // پیاده‌سازی‌های پیش‌فرض ارسال: No-op تا سامانه بدون پیکربندی SMTP کار
+        // کند. جایگزینی آن‌ها با ارائه‌دهنده‌ی واقعی فقط ثبت یک سرویس در DI است.
+        services.AddScoped<IEmailSender, NoOpEmailSender>();
+        services.AddScoped<ISmsSender, NoOpSmsSender>();
+
+        services.AddScoped<INotificationUnitOfWork, NotificationUnitOfWork>();
+    }
+
+    /// <summary>
+    /// راه‌اندازی بخش پیکربندی ماژول اعلان‌ها: گزینه‌های تحویل، ایمیل/پیامک و
+    /// (در صورت تأیید) زمان‌بند تحویل پس‌زمینه.
+    ///
+    /// طبق سیاست پروژه، پردازش پس‌زمینه یک اثر جانبی است و فقط با تأیید صریح
+    /// (<c>Notifications:Scheduler:EnableScheduler</c>) فعال می‌شود. تحویل
+    /// بلافاصله‌ی <c>SendAsync</c> همیشه فعال است؛ زمان‌بند فقط برای امتحان
+    /// مجدد و حجم بالا لازم است.
+    /// </summary>
+    public static IServiceCollection AddOdccNotifications(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<NotificationDeliveryOptions>(configuration.GetSection(NotificationDeliveryOptions.SectionName));
+        services.Configure<NotificationEmailOptions>(configuration.GetSection(NotificationEmailOptions.SectionName));
+        services.Configure<NotificationSmsOptions>(configuration.GetSection(NotificationSmsOptions.SectionName));
+        services.Configure<NotificationSchedulerOptions>(configuration.GetSection(NotificationSchedulerOptions.SectionName));
+
+        var enableScheduler = configuration.GetValue<bool?>($"{NotificationSchedulerOptions.SectionName}:EnableScheduler") is true;
+
+        if (enableScheduler)
+        {
+            services.AddHostedService<NotificationSchedulerHostedService>();
+        }
+
+        return services;
+    }
+
+    /// <summary>
+    /// راه‌اندازی زمان‌بند یادآورهای کمپین.
+    ///
+    /// این سرویس هر چند ثانیه یادآورهای سررسیده را علامت‌گذاری کرده و
+    /// <c>ReminderDueEvent</c> منتشر می‌کند؛ ارسال واقعی پیام در ماژول اعلان‌ها
+    /// انجام می‌شود. چون ارسال پیام یک اثر جانبی است، فقط با تأیید صریح
+    /// (<c>Campaigns:EnableReminderScheduler</c>) فعال می‌شود.
+    /// </summary>
+    public static IServiceCollection AddOdccCampaignReminders(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<CampaignReminderOptions>(configuration.GetSection(CampaignReminderOptions.SectionName));
+
+        var enableScheduler = configuration.GetValue<bool?>($"{CampaignReminderOptions.SectionName}:EnableReminderScheduler") is true;
+
+        if (enableScheduler)
+        {
+            services.AddHostedService<CampaignReminderHostedService>();
+        }
+
+        return services;
     }
 
     private static void ConfigureSql(DbContextOptionsBuilder options, string connectionString)

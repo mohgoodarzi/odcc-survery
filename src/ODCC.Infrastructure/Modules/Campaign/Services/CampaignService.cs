@@ -476,6 +476,17 @@ public sealed class CampaignService(
             {
                 reminder.MarkSent();
                 remindersProcessed++;
+
+                // انتشار رویداد سررسیدن یادآور: ارسال واقعی پیام در ماژول اعلان‌ها
+                // انجام می‌شود. شناسه‌ی ردیف‌های توزیع در رویداد حمل می‌شوند تا
+                // شنونده بدون پرس‌وجوی دوباره و بدون استفاده از DbContext این ماژول
+                // گیرندگان را پیدا کند. این رویداد پس از ذخیره dispatched می‌شود.
+                campaign.RaiseDomainEvent(new ReminderDueEvent(
+                    campaign.Id,
+                    campaign.Code,
+                    reminder.Id,
+                    remindable.Select(d => d.Id).ToList(),
+                    _currentUserService.UserId));
             }
 
             foreach (var distribution in remindable)

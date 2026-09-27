@@ -232,8 +232,10 @@ public class CampaignServiceTests
 
         var campaign = await service.GetByIdAsync(created.Id);
         campaign.Value!.TotalDistributions.Should().Be(2);
+        // شنونده‌ی اعلان‌ها دعوت‌نامه را می‌سازد و نتیجه را روی ردیف توزیع ثبت
+        // می‌کند، پس ردیف‌ها پس از راه‌اندازی در وضعیت ارسال‌شده هستند.
         campaign.Value.DistributionCounts.Should().ContainSingle()
-            .Which.Status.Should().Be(DistributionStatus.Pending);
+            .Which.Status.Should().Be(DistributionStatus.Sent);
     }
 
     [Fact]

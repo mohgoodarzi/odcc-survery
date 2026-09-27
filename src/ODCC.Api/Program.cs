@@ -30,6 +30,7 @@ using ODCC.Infrastructure.Modules.Campaign.Persistence;
 using ODCC.Infrastructure.Modules.Response.Persistence;
 using ODCC.Infrastructure.Modules.Analytics.Persistence;
 using ODCC.Infrastructure.Modules.Reporting.Persistence;
+using ODCC.Infrastructure.Modules.Notification.Persistence;
 using ODCC.Infrastructure.Persistence.Audit;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -42,12 +43,20 @@ var connectionString = builder.Configuration.GetConnectionString("Default");
 builder.Services.AddOdccInfrastructure(connectionString ?? string.Empty);
 builder.Services.AddOdccApplication();
 builder.Services.AddOdccReporting(builder.Configuration);
+builder.Services.AddOdccNotifications(builder.Configuration);
+builder.Services.AddOdccCampaignReminders(builder.Configuration);
 builder.Services.AddOdccDatabaseInitializer(builder.Configuration);
 
 // ---- احراز هویت و مجوزدهی -----------------------------------------------
 // تنظیمات JWT از پیکربندی (بخش Jwt). کلید باید حداقل ۳۲ کاراکتر باشد
 // و از user secrets یا متغیر محیطی تامین شود — هرگز در مخزن کد.
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
+
+// اتصال بخش Jwt به IOptions<JwtOptions>: JwtTokenService و سایر سرویس‌ها
+// تنظیمات را از IOptions می‌گیرند، نه از IConfiguration. بدون این اتصال،
+// IOptions یک نمونه‌ی پیش‌فرض (با Secret خالی) برمی‌گرداند و صدور توکن
+// همواره شکست می‌خورد.
+builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 
 if (string.IsNullOrWhiteSpace(jwtOptions.Secret) || jwtOptions.Secret.Length < 32)
 {
@@ -160,7 +169,8 @@ builder.Services.AddHealthChecks()
     .AddDbContextCheck<CampaignDbContext>("sql-server-campaign")
     .AddDbContextCheck<ResponseDbContext>("sql-server-response")
     .AddDbContextCheck<AnalyticsDbContext>("sql-server-analytics")
-    .AddDbContextCheck<ReportingDbContext>("sql-server-reporting");
+    .AddDbContextCheck<ReportingDbContext>("sql-server-reporting")
+    .AddDbContextCheck<NotificationDbContext>("sql-server-notification");
 
 var app = builder.Build();
 
@@ -213,3 +223,4 @@ app.MapHealthChecks("/health");
 app.MapFallbackToFile("index.html");
 
 app.Run();
+

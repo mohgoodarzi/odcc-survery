@@ -118,6 +118,18 @@ public static class Permissions
         public const string Export = "reports.export";
     }
 
+    /// <summary>مجوزهای اعلان‌ها (صندوق ورودی، ترجیحات و مدیریت قالب‌ها).</summary>
+    public static class Notifications
+    {
+        public const string Group = "notifications";
+
+        /// <summary>مشاهده‌ی صندوق ورودی و ترجیحات خود. هر کاربر احراز هویت‌شده این را دارد.</summary>
+        public const string View = "notifications.view";
+
+        /// <summary>مدیریت قالب‌های اعلان و مشاهده‌ی اعلان‌های همه.</summary>
+        public const string Manage = "notifications.manage";
+    }
+
     /// <summary>مجوزهای برنامه‌های اقدام.</summary>
     public static class Actions
     {
@@ -141,6 +153,7 @@ public static class Permissions
         Response.View, Response.Export,
         Analytics.View, Analytics.DepartmentView, Analytics.CompanyView,
         Reports.View, Reports.Export,
+        Notifications.View, Notifications.Manage,
         Actions.View, Actions.Manage
     ];
 }

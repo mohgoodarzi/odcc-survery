@@ -8,6 +8,7 @@ using ODCC.Infrastructure.Modules.Survey.Persistence;
 using ODCC.Infrastructure.Modules.Campaign.Persistence;
 using ODCC.Infrastructure.Modules.Response.Persistence;
 using ODCC.Infrastructure.Modules.Analytics.Persistence;
+using ODCC.Infrastructure.Modules.Notification.Persistence;
 using ODCC.Infrastructure.Modules.Reporting.Persistence;
 using ODCC.Infrastructure.Persistence.Common;
 
@@ -93,12 +94,23 @@ public class UnitOfWork<TContext> : IUnitOfWork where TContext : DbContext
 
         foreach (var entity in entities)
         {
-            foreach (var domainEvent in entity.DomainEvents)
+            // رویدادها ابتدا برداشت و سپس پاکسازی می‌شوند و بعد تحویل داده
+            // می‌شوند. این ترتیب دو مشکل را حل می‌کند:
+            //
+            // ۱. یک شنونده ممکن است خودش SaveChanges صدا بزند (مثلاً شنونده‌ی
+            // اعلان‌ها نتیجه‌ی ارسال را روی ردیف توزیع ثبت می‌کند). آن فراخوانی
+            // تودرتوی دوباره وارد همین متد می‌شود؛ اگر مجموعه‌ی رویدادها هنوز
+            // پاکسازی نشده بود، همان رویدادها دوبار تحویل داده می‌شدند و اگر
+            // در حین شمارش پاکسازی می‌شدند، خطای «مجموعه تغییر کرد» رخ می‌داد.
+            // ۲. رویدادهای جدیدی که شنونده روی همین موجودیت منتشر می‌کند توسط
+            // فراخوانی تودرتوی خودش تحویل داده می‌شوند، نه توسط این حلقه.
+            var pending = entity.DomainEvents.ToList();
+            entity.ClearDomainEvents();
+
+            foreach (var domainEvent in pending)
             {
                 await _domainEventDispatcher.DispatchAsync(domainEvent, ct);
             }
-
-            entity.ClearDomainEvents();
         }
     }
 }
@@ -156,3 +168,9 @@ public sealed class AnalyticsUnitOfWork(AnalyticsDbContext context, IDomainEvent
 /// </summary>
 public sealed class ReportingUnitOfWork(ReportingDbContext context, IDomainEventDispatcher domainEventDispatcher)
     : UnitOfWork<ReportingDbContext>(context, domainEventDispatcher), IReportingUnitOfWork;
+
+/// <summary>
+/// مرز تراکنشی ماژول اعلان‌ها.
+/// </summary>
+public sealed class NotificationUnitOfWork(NotificationDbContext context, IDomainEventDispatcher domainEventDispatcher)
+    : UnitOfWork<NotificationDbContext>(context, domainEventDispatcher), INotificationUnitOfWork;

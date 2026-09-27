@@ -59,6 +59,11 @@ public interface IAnalyticsUnitOfWork : IUnitOfWork;
 public interface IReportingUnitOfWork : IUnitOfWork;
 
 /// <summary>
+/// مرز تراکنشی ماژول اعلان‌ها. فقط این ماژول باید آن را تزریق بگیرد.
+/// </summary>
+public interface INotificationUnitOfWork : IUnitOfWork;
+
+/// <summary>
 /// مشخصه‌ی پرس‌وجوی قابل‌استفاده مجدد: فیلتر، مرتب‌سازی و بارگذاری ناوبری.
 /// </summary>
 public interface ISpecification<T> where T : BaseEntity

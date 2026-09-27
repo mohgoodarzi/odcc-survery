@@ -18,6 +18,7 @@ using ODCC.Application.Modules.Campaign.Abstractions;
 using ODCC.Application.Modules.Response.Abstractions;
 using ODCC.Application.Modules.Analytics.Abstractions;
 using ODCC.Application.Modules.Reporting.Abstractions;
+using ODCC.Application.Modules.Notification.Abstractions;
 using ODCC.Infrastructure.Modules.Audit.EventListeners;
 using ODCC.Infrastructure.Repositories.Audit;
 using ODCC.Infrastructure.Modules.Identity;
@@ -53,6 +54,10 @@ using ODCC.Infrastructure.Modules.Reporting.EventListeners;
 using ODCC.Infrastructure.Modules.Reporting.Persistence;
 using ODCC.Infrastructure.Modules.Reporting.Repositories;
 using ODCC.Infrastructure.Modules.Reporting.Services;
+using ODCC.Infrastructure.Modules.Notification.EventListeners;
+using ODCC.Infrastructure.Modules.Notification.Persistence;
+using ODCC.Infrastructure.Modules.Notification.Repositories;
+using ODCC.Infrastructure.Modules.Notification.Services;
 using ODCC.Infrastructure.Modules.Organization.Persistence;
 using ODCC.Infrastructure.Modules.Organization.Repositories;
 using ODCC.Infrastructure.Modules.Organization.Services;
@@ -83,6 +88,7 @@ public sealed class TestEnvironment : IAsyncDisposable
     public ResponseDbContext ResponseDbContext { get; }
     public AnalyticsDbContext AnalyticsDbContext { get; }
     public ReportingDbContext ReportingDbContext { get; }
+    public NotificationDbContext NotificationDbContext { get; }
 
     private readonly SqliteConnection _identityConnection;
     private readonly SqliteConnection _organizationConnection;
@@ -94,6 +100,7 @@ public sealed class TestEnvironment : IAsyncDisposable
     private readonly SqliteConnection _responseConnection;
     private readonly SqliteConnection _analyticsConnection;
     private readonly SqliteConnection _reportingConnection;
+    private readonly SqliteConnection _notificationConnection;
 
     private TestEnvironment(
         IServiceProvider services,
@@ -106,6 +113,7 @@ public sealed class TestEnvironment : IAsyncDisposable
         ResponseDbContext responseDbContext,
         AnalyticsDbContext analyticsDbContext,
         ReportingDbContext reportingDbContext,
+        NotificationDbContext notificationDbContext,
         SqliteConnection identityConnection,
         SqliteConnection organizationConnection,
         SqliteConnection auditConnection,
@@ -115,7 +123,8 @@ public sealed class TestEnvironment : IAsyncDisposable
         SqliteConnection campaignConnection,
         SqliteConnection responseConnection,
         SqliteConnection analyticsConnection,
-        SqliteConnection reportingConnection)
+        SqliteConnection reportingConnection,
+        SqliteConnection notificationConnection)
     {
         Services = services;
         IdentityDbContext = identityDbContext;
@@ -127,6 +136,7 @@ public sealed class TestEnvironment : IAsyncDisposable
         ResponseDbContext = responseDbContext;
         AnalyticsDbContext = analyticsDbContext;
         ReportingDbContext = reportingDbContext;
+        NotificationDbContext = notificationDbContext;
         _identityConnection = identityConnection;
         _organizationConnection = organizationConnection;
         _auditConnection = auditConnection;
@@ -137,6 +147,7 @@ public sealed class TestEnvironment : IAsyncDisposable
         _responseConnection = responseConnection;
         _analyticsConnection = analyticsConnection;
         _reportingConnection = reportingConnection;
+        _notificationConnection = notificationConnection;
     }
 
     /// <summary>
@@ -174,6 +185,9 @@ public sealed class TestEnvironment : IAsyncDisposable
 
         var reportingConnection = new SqliteConnection("DataSource=:memory:");
         await reportingConnection.OpenAsync();
+
+        var notificationConnection = new SqliteConnection("DataSource=:memory:");
+        await notificationConnection.OpenAsync();
 
         var services = new ServiceCollection();
 
@@ -213,6 +227,9 @@ public sealed class TestEnvironment : IAsyncDisposable
 
         services.AddDbContext<ReportingDbContext>(options =>
             options.UseSqlite(reportingConnection));
+
+        services.AddDbContext<NotificationDbContext>(options =>
+            options.UseSqlite(notificationConnection));
 
         services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
             {
@@ -280,6 +297,17 @@ public sealed class TestEnvironment : IAsyncDisposable
         services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Reporting.Events.ReportExecutionStartedEvent>, ReportingAuditEventListener>();
         services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Reporting.Events.ReportExecutionSucceededEvent>, ReportingAuditEventListener>();
         services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Reporting.Events.ReportExecutionFailedEvent>, ReportingAuditEventListener>();
+
+        // شنونده‌ی ممیزی برای رویدادهای اعلان‌ها.
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Notification.Events.NotificationCreatedEvent>, NotificationAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Notification.Events.NotificationDeliveredEvent>, NotificationAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Notification.Events.NotificationFailedEvent>, NotificationAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Notification.Events.NotificationReadEvent>, NotificationAuditEventListener>();
+
+        // شنونده‌ی اعلان‌ها: دعوت‌نامه و یادآور کمپین.
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Campaign.Events.CampaignLaunchedEvent>, CampaignNotificationEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Campaign.Events.ReminderDueEvent>, CampaignNotificationEventListener>();
+
         services.AddScoped<IAuditEntryRepository, AuditEntryRepository>();
         services.AddScoped<IAuditService, AuditService>();
         services.AddScoped<IRefreshTokenStore, RefreshTokenStore>();
@@ -293,6 +321,7 @@ public sealed class TestEnvironment : IAsyncDisposable
         services.AddScoped<IResponseUnitOfWork, ResponseUnitOfWork>();
         services.AddScoped<IAnalyticsUnitOfWork, AnalyticsUnitOfWork>();
         services.AddScoped<IReportingUnitOfWork, ReportingUnitOfWork>();
+        services.AddScoped<INotificationUnitOfWork, NotificationUnitOfWork>();
 
         services.AddScoped<IOrgUnitRepository, OrgUnitRepository>();
         services.AddScoped<IPositionRepository, PositionRepository>();
@@ -336,6 +365,23 @@ public sealed class TestEnvironment : IAsyncDisposable
         // انبار فایل گزارش در آزمون: شاخه‌ی موقت که در پایان آزمون پاک می‌شود.
         services.AddSingleton<IReportArtifactStore, TempDirectoryReportArtifactStore>();
 
+        // ماژول اعلان‌ها: مخازن، سرویس‌ها، رندر قالب، حل‌کننده‌ی گیرنده و
+        // ارائه‌دهنده‌های تحویل (درون‌برنامه‌ای/ایمیل/پیامک).
+        services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<INotificationTemplateRepository, NotificationTemplateRepository>();
+        services.AddScoped<INotificationPreferenceRepository, NotificationPreferenceRepository>();
+        services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<INotificationTemplateService, NotificationTemplateService>();
+        services.AddScoped<INotificationPreferenceService, NotificationPreferenceService>();
+        services.AddScoped<INotificationTemplateRenderer, NotificationTemplateRenderer>();
+        services.AddScoped<INotificationRecipientResolver, NotificationRecipientResolver>();
+        services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
+        services.AddScoped<INotificationDeliveryProvider, InAppNotificationProvider>();
+        services.AddScoped<INotificationDeliveryProvider, EmailNotificationProvider>();
+        services.AddScoped<INotificationDeliveryProvider, SmsNotificationProvider>();
+        services.AddScoped<IEmailSender, NoOpEmailSender>();
+        services.AddScoped<ISmsSender, NoOpSmsSender>();
+
         // پیاده‌سازی پیش‌فرض و بدون اثر هوش مصنوعی — هیچ داده‌ای از سامانه خارج نمی‌شود.
         services.AddSingleton<IAnalyticsAiService, NoOpAnalyticsAiService>();
 
@@ -365,6 +411,7 @@ public sealed class TestEnvironment : IAsyncDisposable
         var responseDbContext = provider.GetRequiredService<ResponseDbContext>();
         var analyticsDbContext = provider.GetRequiredService<AnalyticsDbContext>();
         var reportingDbContext = provider.GetRequiredService<ReportingDbContext>();
+        var notificationDbContext = provider.GetRequiredService<NotificationDbContext>();
 
         await identityDbContext.Database.EnsureCreatedAsync();
         await organizationDbContext.Database.EnsureCreatedAsync();
@@ -376,13 +423,14 @@ public sealed class TestEnvironment : IAsyncDisposable
         await responseDbContext.Database.EnsureCreatedAsync();
         await analyticsDbContext.Database.EnsureCreatedAsync();
         await reportingDbContext.Database.EnsureCreatedAsync();
+        await notificationDbContext.Database.EnsureCreatedAsync();
 
         return new TestEnvironment(provider, identityDbContext, organizationDbContext,
             questionBankDbContext, questionnaireDbContext, surveyDbContext, campaignDbContext,
-            responseDbContext, analyticsDbContext, reportingDbContext,
+            responseDbContext, analyticsDbContext, reportingDbContext, notificationDbContext,
             identityConnection, organizationConnection, auditConnection,
             questionBankConnection, questionnaireConnection, surveyConnection, campaignConnection,
-            responseConnection, analyticsConnection, reportingConnection);
+            responseConnection, analyticsConnection, reportingConnection, notificationConnection);
     }
 
     /// <summary>
@@ -488,6 +536,7 @@ public sealed class TestEnvironment : IAsyncDisposable
         await ResponseDbContext.DisposeAsync();
         await AnalyticsDbContext.DisposeAsync();
         await ReportingDbContext.DisposeAsync();
+        await NotificationDbContext.DisposeAsync();
         await _identityConnection.DisposeAsync();
         await _organizationConnection.DisposeAsync();
         await _auditConnection.DisposeAsync();

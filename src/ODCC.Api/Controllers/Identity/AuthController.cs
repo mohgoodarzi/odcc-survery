@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ODCC.Application.Authorization;
 using ODCC.Application.Modules.Identity.Abstractions;
@@ -8,6 +9,11 @@ namespace ODCC.Api.Controllers.Identity;
 /// <summary>
 /// احراز هویت: ورود، تازه‌سازی توکن و خروج.
 /// این اندپوینت‌ها ناشناس (بدون نیاز به توکن) هستند.
+///
+/// <b>نکته:</b> سیاست مجوزدهی پروژه «fail-closed» است: هر اندپوینتی که
+/// <c>[AllowAnonymous]</c> نداشته باشد نیازمند کاربر احراز هویت‌شده است. بدون
+/// این ویژگی، خود اندپوینت ورود هم پیش از اجرا رد می‌شود (انتقال به صفحه‌ی
+/// ورود) و هیچ‌گاه نمی‌توان توکنی گرفت.
 /// </summary>
 [ApiController]
 [Route("api/{culture:language}/auth")]
@@ -22,6 +28,7 @@ public sealed class AuthController(
     /// ورود به سامانه. در صورت موفقیت، جفت توکن دسترسی و تازه‌سازی برگردانده می‌شود.
     /// </summary>
     [HttpPost("login")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(LoginResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<LoginResult>> Login(
@@ -51,6 +58,7 @@ public sealed class AuthController(
     /// تازه‌سازی توکن دسترسی با توکن تازه‌سازی.
     /// </summary>
     [HttpPost("refresh")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(TokenResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<TokenResponse>> Refresh(
@@ -96,6 +104,7 @@ public sealed class AuthController(
     /// توکن در بدنه‌ی درخواست ارسال می‌شود تا در URL و لاگ‌های سرور ثبت نشود.
     /// </summary>
     [HttpPost("validate")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public IActionResult Validate([FromBody] ValidateTokenRequest request)

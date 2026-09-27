@@ -161,7 +161,7 @@ public sealed class JwtTokenService(
 
     private SymmetricSecurityKey GetSigningKey()
     {
-        if (_options.Secret.Length < 32)
+        if (string.IsNullOrEmpty(_options.Secret) || _options.Secret.Length < 32)
         {
             throw new InvalidOperationException(
                 "کلید امضای JWT حداقل باید ۳۲ کاراکتر باشد. آن را با متغیر محیطی Jwt__Secret " +
