@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, FileText, Megaphone, BarChart3, FileBarChart, Settings, Languages,
   Users, ShieldCheck, Building2, Briefcase, UserCircle, LogOut, ChevronDown,
-  LayoutTemplate, ClipboardCheck, MessageSquareText
+  LayoutTemplate, ClipboardCheck, MessageSquareText, ClipboardList
 } from 'lucide-react';
 
 import { useAuth } from '@/auth/AuthProvider';
@@ -66,6 +66,18 @@ export function AppLayout({ children }: { children: ReactNode }) {
       label: t.nav.reports,
       icon: FileBarChart,
       permissions: [Permissions.Reports.View]
+    },
+    {
+      to: `/${culture}/actions/plans`,
+      label: t.nav.actions,
+      icon: ClipboardList,
+      permissions: [Permissions.Actions.View]
+    },
+    {
+      to: `/${culture}/actions/items`,
+      label: t.actions.assignedToMe,
+      icon: ClipboardCheck,
+      permissions: [Permissions.Actions.View]
     },
     {
       to: `/${culture}/organization/units`,

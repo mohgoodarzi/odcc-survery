@@ -31,6 +31,7 @@ using ODCC.Infrastructure.Modules.Response.Persistence;
 using ODCC.Infrastructure.Modules.Analytics.Persistence;
 using ODCC.Infrastructure.Modules.Reporting.Persistence;
 using ODCC.Infrastructure.Modules.Notification.Persistence;
+using ODCC.Infrastructure.Modules.ActionManagement.Persistence;
 using ODCC.Infrastructure.Persistence.Audit;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -45,6 +46,7 @@ builder.Services.AddOdccApplication();
 builder.Services.AddOdccReporting(builder.Configuration);
 builder.Services.AddOdccNotifications(builder.Configuration);
 builder.Services.AddOdccCampaignReminders(builder.Configuration);
+builder.Services.AddOdccActions(builder.Configuration);
 builder.Services.AddOdccDatabaseInitializer(builder.Configuration);
 
 // ---- احراز هویت و مجوزدهی -----------------------------------------------
@@ -170,7 +172,8 @@ builder.Services.AddHealthChecks()
     .AddDbContextCheck<ResponseDbContext>("sql-server-response")
     .AddDbContextCheck<AnalyticsDbContext>("sql-server-analytics")
     .AddDbContextCheck<ReportingDbContext>("sql-server-reporting")
-    .AddDbContextCheck<NotificationDbContext>("sql-server-notification");
+    .AddDbContextCheck<NotificationDbContext>("sql-server-notification")
+    .AddDbContextCheck<ActionManagementDbContext>("sql-server-action-management");
 
 var app = builder.Build();
 

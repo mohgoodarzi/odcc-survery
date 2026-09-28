@@ -49,6 +49,10 @@ export const Permissions = {
   Reports: {
     View: 'reports.view',
     Export: 'reports.export'
+  },
+  Actions: {
+    View: 'actions.view',
+    Manage: 'actions.manage'
   }
 } as const;
 

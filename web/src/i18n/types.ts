@@ -40,6 +40,7 @@ export interface Dictionary {
     administration: string;
     mySurveys: string;
     responses: string;
+    actions: string;
   };
   common: {
     search: string;
@@ -729,6 +730,158 @@ export interface Dictionary {
     errorReportArchived: string;
     errorArtifactUnavailable: string;
     errorArtifactMissing: string;
+    /** حریم خصوصی. */
+    privacyNote: string;
+  };
+  actions: {
+    title: string;
+    description: string;
+    /** جستجو و فیلتر. */
+    searchPlaceholder: string;
+    assignedToMe: string;
+    overdueOnly: string;
+    includeArchived: string;
+    mineOnly: string;
+    /** برچسب ستون‌ها. */
+    planTitle: string;
+    itemTitle: string;
+    assignee: string;
+    owner: string;
+    priority: string;
+    status: string;
+    source: string;
+    dueDate: string;
+    remindAt: string;
+    createdAt: string;
+    completedAt: string;
+    escalation: string;
+    progress: string;
+    effectiveness: string;
+    /** دیالوگ برنامه. */
+    newPlan: string;
+    editPlan: string;
+    planName: string;
+    planDescription: string;
+    survey: string;
+    selectSurvey: string;
+    orgUnit: string;
+    selectOrgUnit: string;
+    selectOwner: string;
+    activateImmediately: string;
+    activateImmediatelyHint: string;
+    /** دیالوگ آیتم. */
+    newItem: string;
+    editItem: string;
+    itemDescription: string;
+    selectAssignee: string;
+    displayOrder: string;
+    /** اکشن‌های چرخه‌ی عمر برنامه. */
+    activate: string;
+    complete: string;
+    cancel: string;
+    archive: string;
+    addOutcome: string;
+    outcomeValue: string;
+    outcomeHint: string;
+    /** اکشن‌های آیتم. */
+    start: string;
+    reopen: string;
+    done: string;
+    assessEffectiveness: string;
+    effectivenessNote: string;
+    selectEffectiveness: string;
+    /** دیدگاه‌ها. */
+    comments: string;
+    addComment: string;
+    commentPlaceholder: string;
+    noComments: string;
+    /** پیوست‌ها. */
+    evidence: string;
+    uploadEvidence: string;
+    downloadEvidence: string;
+    deleteEvidence: string;
+    noEvidence: string;
+    /** آمار. */
+    statsOpenPlans: string;
+    statsActivePlans: string;
+    statsCompletedPlans: string;
+    statsMyOpenItems: string;
+    statsMyOverdueItems: string;
+    statsOpenItems: string;
+    statsOverdueItems: string;
+    statsEscalatedItems: string;
+    statsCompletedThisPeriod: string;
+    statsAverageProgress: string;
+    statsEffectivenessScore: string;
+    /** پیام‌های موفقیت. */
+    planCreated: string;
+    planUpdated: string;
+    planActivated: string;
+    planCompleted: string;
+    planCancelled: string;
+    planArchived: string;
+    outcomeRecorded: string;
+    itemCreated: string;
+    itemUpdated: string;
+    itemTransitioned: string;
+    effectivenessAssessed: string;
+    commentAdded: string;
+    evidenceUploaded: string;
+    evidenceDeleted: string;
+    /** تأییدها. */
+    activateConfirmTitle: string;
+    activateConfirmDescription: string;
+    completeConfirmTitle: string;
+    completeConfirmDescription: string;
+    cancelConfirmTitle: string;
+    cancelConfirmDescription: string;
+    archiveConfirmTitle: string;
+    archiveConfirmDescription: string;
+    deleteEvidenceConfirmTitle: string;
+    deleteEvidenceConfirmDescription: string;
+    /** حالت‌های خالی. */
+    noPlans: string;
+    noPlansDescription: string;
+    noItems: string;
+    noItemsDescription: string;
+    /** برچسب‌های چرخه‌ی عمر. */
+    statusDraft: string;
+    statusActive: string;
+    statusCompleted: string;
+    statusCancelled: string;
+    statusArchived: string;
+    statusOpen: string;
+    statusInProgress: string;
+    statusDone: string;
+    statusItemCancelled: string;
+    sourceManual: string;
+    sourceAnalyticsAlert: string;
+    sourceSurveyFinding: string;
+    priorityLow: string;
+    priorityMedium: string;
+    priorityHigh: string;
+    priorityCritical: string;
+    escalationNone: string;
+    escalationReminder: string;
+    escalationOwner: string;
+    escalationManagement: string;
+    effectivenessNotAssessed: string;
+    effectivenessEffective: string;
+    effectivenessPartially: string;
+    effectivenessIneffective: string;
+    /** کدهای خطای سمت سرور. */
+    errorPlanNotFound: string;
+    errorItemNotFound: string;
+    errorPlanArchived: string;
+    errorPlanClosed: string;
+    errorNotAuthorized: string;
+    errorOrgUnitOutOfScope: string;
+    errorEvidenceNotFound: string;
+    errorEvidenceMissing: string;
+    errorEvidenceUploadFailed: string;
+    errorInvalidTransition: string;
+    errorItemNotFinished: string;
+    errorSameStatus: string;
     /** حریم خصوصی. */
     privacyNote: string;
   };

@@ -95,6 +95,46 @@ internal static class DefaultNotificationTemplates
             {
                 [Language.Fa] = ("{{subject}}", "{{body}}"),
                 [Language.En] = ("{{subject}}", "{{body}}")
+            },
+
+            // --- مدیریت اقدامات ---------------------------------------------------
+            // همه‌ی این قالب‌ها فقط متادیتای عمومی (عنوان کار، نام مسئول، مهلت)
+            // را حمل می‌کنند — هرگز محتوای پاسخ یک پاسخ‌دهنده را نه.
+            ["action_assigned"] = new()
+            {
+                [Language.Fa] = (
+                    "کار جدید: {{action_title}}",
+                    "سلام {{recipient_name}} عزیز،\n\nکار «{{action_title}}» در برنامه‌ی اقدام «{{plan_title}}» به شما منتقل شد.\nمهلت نهایی: {{due_date}}\nاولویت: {{priority}}\n\nمی‌توانید جزئیات را در بخش «اقدامات» ببینید."),
+                [Language.En] = (
+                    "New task: {{action_title}}",
+                    "Hello {{recipient_name}},\n\nThe task \"{{action_title}}\" in action plan \"{{plan_title}}\" has been assigned to you.\nDue date: {{due_date}}\nPriority: {{priority}}\n\nYou can view the details in the \"Actions\" section.")
+            },
+            ["action_reminder"] = new()
+            {
+                [Language.Fa] = (
+                    "یادآوری: کار «{{action_title}}» سررسیده است",
+                    "سلام {{recipient_name}} عزیز،\n\nکار «{{action_title}}» در برنامه‌ی اقدام «{{plan_title}}» سررسیده شده است.\nمهلت نهایی: {{due_date}}\n\nلطفاً وضعیت آن را در بخش «اقدامات» به‌روزرسانی کنید."),
+                [Language.En] = (
+                    "Reminder: task \"{{action_title}}\" is due",
+                    "Hello {{recipient_name}},\n\nThe task \"{{action_title}}\" in action plan \"{{plan_title}}\" is now due.\nDue date: {{due_date}}\n\nPlease update its status in the \"Actions\" section.")
+            },
+            ["action_escalated"] = new()
+            {
+                [Language.Fa] = (
+                    "تشدید: کار «{{action_title}}» سررسیده شده است",
+                    "کار «{{action_title}}» در برنامه‌ی اقدام «{{plan_title}}» سررسیده شده و یک درجه تشدید شد.\n\nمسئول: {{assignee_name}}\nمهلت نهایی: {{due_date}}\nدرجه‌ی تشدید: {{escalation_level}}\n\nلطفاً برای رفع تأخیر اقدام کنید."),
+                [Language.En] = (
+                    "Escalation: task \"{{action_title}}\" is overdue",
+                    "The task \"{{action_title}}\" in action plan \"{{plan_title}}\" is overdue and has been escalated.\n\nAssignee: {{assignee_name}}\nDue date: {{due_date}}\nEscalation level: {{escalation_level}}\n\nPlease act to resolve the delay.")
+            },
+            ["action_completed"] = new()
+            {
+                [Language.Fa] = (
+                    "کار «{{action_title}}» تکمیل شد",
+                    "کار «{{action_title}}» در برنامه‌ی اقدام «{{plan_title}}» توسط {{assignee_name}} تکمیل شد.\n\nشما می‌توانید اثربخشی آن را در بخش «اقدامات» ارزیابی کنید."),
+                [Language.En] = (
+                    "Task \"{{action_title}}\" completed",
+                    "The task \"{{action_title}}\" in action plan \"{{plan_title}}\" was completed by {{assignee_name}}.\n\nYou can assess its effectiveness in the \"Actions\" section.")
             }
         };
 

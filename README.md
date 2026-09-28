@@ -73,6 +73,12 @@ dotnet ef migrations add InitialCreate -p src/ODCC.Infrastructure -s src/ODCC.Ap
 # ماژول تحلیلات (عکس‌العمل‌های محاسبه‌شده، بنچمارک‌ها)
 dotnet ef migrations add InitialCreate -p src/ODCC.Infrastructure -s src/ODCC.Api -c AnalyticsDbContext -o Modules/Analytics/Persistence/Migrations
 
+# ماژول اعلان‌ها (تحویل درون‌برنامه‌ای/ایمیل/پیامک، قالب‌ها)
+dotnet ef migrations add InitialCreate -p src/ODCC.Infrastructure -s src/ODCC.Api -c NotificationDbContext -o Modules/Notification/Persistence/Migrations
+
+# ماژول مدیریت اقدامات (برنامه‌ها، آیتم‌ها، دیدگاه‌ها، پیوست‌ها)
+dotnet ef migrations add InitialCreate -p src/ODCC.Infrastructure -s src/ODCC.Api -c ActionManagementDbContext -o Modules/ActionManagement/Persistence/Migrations
+
 # اعمال همه‌ی مهاجرت‌ها (پس از تأیید)
 dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c AuditDbContext
 dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c IdentityDbContext
@@ -83,6 +89,8 @@ dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c SurveyDb
 dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c CampaignDbContext
 dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c ResponseDbContext
 dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c AnalyticsDbContext
+dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c NotificationDbContext
+dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c ActionManagementDbContext
 ```
 
 > **هیچ‌کدام از این دستورات را تا دریافت تأیید اجرا نکنید.**
@@ -158,8 +166,8 @@ dotnet publish src/ODCC.Api -c Release -o ./publish
 
 **فاز ۰** (زیرساخت و مبنا)، **فاز ۱** (هویت، مجوزدهی و سازمان)، **فاز ۲**
 (کتابخانه‌ی سؤالات و پرسشنامه)، **فاز ۳** (نظرسنجی و کمپین)، **فاز ۴**
-(مدیریت پاسخ)، **فاز ۵** (تحلیلات و داشبورد)، **فاز ۶** (گزارش‌گیری) و
-**فاز ۷** (اعلان‌ها) پیاده‌سازی شده‌اند.
+(مدیریت پاسخ)، **فاز ۵** (تحلیلات و داشبورد)، **فاز ۶** (گزارش‌گیری)،
+**فاز ۷** (اعلان‌ها) و **فاز ۸** (مدیریت اقدام و پیگیری) پیاده‌سازی شده‌اند.
 ماژول‌های پیاده‌سازی‌شده تاکنون: Audit (ماژول مرجع)، Identity (کاربران، نقش‌ها،
 JWT، توکن‌های تازه‌سازی)، Organization (واحدهای سازمانی، موقعیت‌ها، کارمندان)،
 QuestionBank (سؤالات قابل‌استفاده‌ی مجدد، نسخه‌گذاری)، Questionnaire (بخش‌ها،
@@ -169,7 +177,9 @@ QuestionBank (سؤالات قابل‌استفاده‌ی مجدد، نسخه‌
 داشبورد، روند زمانی، بخش‌بندی سازمانی، بنچمارک‌ها)، Reporting (تعاریف گزارش،
 خروجی PDF/Excel، گزارش‌های زمان‌بندی‌شده، نگه‌داری پنجره‌ی خروجی) و
 Notification (تحویل درون‌برنامه‌ای/ایمیل/پیامک، قالب‌های قابل‌ویرایش، ترجیحات
-انصراف کاربر، امتحان مجدد نمایی). سایر
+انصراف کاربر، امتحان مجدد نمایی) و ActionManagement (برنامه‌های اقدام از
+نتایج، مالکان و مسئولان، مهلت‌ها، یادآور و تشدید خودکار، دیدگاه‌ها و پیوست‌ها،
+سنجش اثربخشی با مقایسه‌ی شاخص قبل/بعد). سایر
 ماژول‌ها در فازهای بعدی ساخته می‌شوند. به جدول فازها در پروژه‌ی معماری مراجعه
 کنید.
 

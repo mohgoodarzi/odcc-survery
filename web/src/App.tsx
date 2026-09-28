@@ -23,6 +23,8 @@ import { AnalyticsDashboardPage } from '@/routes/analytics/AnalyticsDashboardPag
 import { SurveyAnalyticsPage } from '@/routes/analytics/SurveyAnalyticsPage';
 import { BenchmarksPage } from '@/routes/analytics/BenchmarksPage';
 import { ReportsPage } from '@/routes/reports/ReportsPage';
+import { ActionPlansPage } from '@/routes/actions/ActionPlansPage';
+import { ActionItemsPage } from '@/routes/actions/ActionItemsPage';
 
 /**
  * مسیرها با پیشوند فرهنگ هستند: /fa/dashboard , /en/surveys ...
@@ -173,6 +175,24 @@ export function AppRoutes() {
         element={
           <RequireAuth permissions={[Permissions.Reports.View]}>
             <ReportsPage />
+          </RequireAuth>
+        }
+      />
+
+      {/* برنامه‌های اقدام */}
+      <Route
+        path="/:culture/actions/plans"
+        element={
+          <RequireAuth permissions={[Permissions.Actions.View]}>
+            <ActionPlansPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/:culture/actions/items"
+        element={
+          <RequireAuth permissions={[Permissions.Actions.View]}>
+            <ActionItemsPage />
           </RequireAuth>
         }
       />

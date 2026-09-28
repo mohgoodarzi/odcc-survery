@@ -20,6 +20,12 @@ using ODCC.Application.Modules.Response.Abstractions;
 using ODCC.Application.Modules.Analytics.Abstractions;
 using ODCC.Application.Modules.Reporting.Abstractions;
 using ODCC.Application.Modules.Notification.Abstractions;
+using ODCC.Application.Modules.ActionManagement.Abstractions;
+using ODCC.Infrastructure.Modules.ActionManagement.EventListeners;
+using ODCC.Infrastructure.Modules.ActionManagement.Persistence;
+using ODCC.Infrastructure.Modules.ActionManagement.Repositories;
+using ODCC.Infrastructure.Modules.ActionManagement.Scheduled;
+using ODCC.Infrastructure.Modules.ActionManagement.Services;
 using ODCC.Infrastructure.Modules.Audit.EventListeners;
 using ODCC.Infrastructure.Modules.Identity;
 using ODCC.Infrastructure.Modules.Identity.Entities;
@@ -179,6 +185,37 @@ public static class DependencyInjection
         services.AddScoped<IDomainEventListener<Domain.Modules.Campaign.Events.CampaignLaunchedEvent>, CampaignNotificationEventListener>();
         services.AddScoped<IDomainEventListener<Domain.Modules.Campaign.Events.ReminderDueEvent>, CampaignNotificationEventListener>();
 
+        // شنونده‌ی اعلان‌ها: انتصاب، یادآور، تشدید و تکمیل آیتم‌های اقدام را به
+        // پیام تبدیل می‌کند. این شنونده در ماژول اعلان‌ها ثبت می‌شود چون
+        // موجودیت‌های ساخته‌شده (Notification) متعلق به این ماژول است، ولی به
+        // رویدادهای ماژول مدیریت اقدامات گوش می‌دهد.
+        services.AddScoped<IDomainEventListener<Domain.Modules.ActionManagement.Events.ActionItemCreatedEvent>, ActionNotificationEventListener>();
+        // نکته: تغییر وضعیت آیتم عمداً اعلان نمی‌شود (فقط ممیزی می‌شود) تا
+        // صندوق ورودی کاربران با اعلان‌های کم‌اهمیت پر نشود.
+        services.AddScoped<IDomainEventListener<Domain.Modules.ActionManagement.Events.ActionItemCompletedEvent>, ActionNotificationEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.ActionManagement.Events.ActionItemReminderDueEvent>, ActionNotificationEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.ActionManagement.Events.ActionItemEscalatedEvent>, ActionNotificationEventListener>();
+
+        // شنونده‌ی مدیریت اقدامات: هشدارهای تحلیلات (افت NPS/CSAT/CES) را به
+        // برنامه‌ی اقدام خودکار تبدیل می‌کند. این شنونده در ماژول مدیریت
+        // اقدامات ثبت می‌شود چون موجودیت‌های ساخته‌شده (ActionPlan) متعلق به
+        // همین ماژول است، ولی به رویدادهای ماژول تحلیلات گوش می‌دهد.
+        services.AddScoped<IDomainEventListener<Domain.Modules.Analytics.Events.AnalyticsComputedEvent>, AnalyticsActionEventListener>();
+
+        // شنونده‌ی ممیزی برای رویدادهای مدیریت اقدامات.
+        services.AddScoped<IDomainEventListener<Domain.Modules.ActionManagement.Events.ActionPlanCreatedEvent>, ActionManagementAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.ActionManagement.Events.ActionPlanUpdatedEvent>, ActionManagementAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.ActionManagement.Events.ActionPlanActivatedEvent>, ActionManagementAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.ActionManagement.Events.ActionPlanCompletedEvent>, ActionManagementAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.ActionManagement.Events.ActionPlanCancelledEvent>, ActionManagementAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.ActionManagement.Events.ActionPlanArchivedEvent>, ActionManagementAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.ActionManagement.Events.ActionItemCreatedEvent>, ActionManagementAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.ActionManagement.Events.ActionItemUpdatedEvent>, ActionManagementAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.ActionManagement.Events.ActionItemStatusChangedEvent>, ActionManagementAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.ActionManagement.Events.ActionItemEscalatedEvent>, ActionManagementAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.ActionManagement.Events.ActionCommentAddedEvent>, ActionManagementAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.ActionManagement.Events.ActionEvidenceUploadedEvent>, ActionManagementAuditEventListener>();
+
         ConfigureAudit(services, connectionString, configure);
         ConfigureIdentity(services, connectionString, configure);
         ConfigureOrganization(services, connectionString, configure);
@@ -190,6 +227,7 @@ public static class DependencyInjection
         ConfigureAnalytics(services, connectionString, configure);
         ConfigureReporting(services, connectionString, configure);
         ConfigureNotification(services, connectionString, configure);
+        ConfigureActionManagement(services, connectionString, configure);
 
         return services;
     }
@@ -570,6 +608,52 @@ public static class DependencyInjection
         services.AddScoped<ISmsSender, NoOpSmsSender>();
 
         services.AddScoped<INotificationUnitOfWork, NotificationUnitOfWork>();
+    }
+
+    // --- ماژول مدیریت اقدامات ----------------------------------------------
+
+    private static void ConfigureActionManagement(
+        IServiceCollection services,
+        string connectionString,
+        Action<DbContextOptionsBuilder>? configure)
+    {
+        services.AddDbContext<ActionManagementDbContext>(options =>
+        {
+            ConfigureSql(options, connectionString);
+            configure?.Invoke(options);
+        });
+
+        services.AddScoped<IActionPlanRepository, ActionPlanRepository>();
+        services.AddScoped<IActionItemRepository, ActionItemRepository>();
+        services.AddScoped<IActionManagementService, ActionManagementService>();
+
+        // انبار پیوست‌ها: شاخه‌ی ریشه‌ی پیکربندی‌شده با جلوگیری از path traversal.
+        services.AddSingleton<IActionEvidenceStore, FileSystemActionEvidenceStore>();
+
+        services.AddScoped<IActionManagementUnitOfWork, ActionManagementUnitOfWork>();
+    }
+
+    /// <summary>
+    /// راه‌اندازی بخش پیکربندی ماژول مدیریت اقدامات: تنظیمات پیگیری خودکار،
+    /// هشدارهای تحلیلات و انبار پیوست‌ها.
+    ///
+    /// طبق سیاست پروژه، پردازش پس‌زمینه (یادآور/تشدید) یک اثر جانبی است و فقط
+    /// با تأیید صریح (<c>Actions:FollowUp:EnableFollowUpScheduler</c>) فعال می‌شود.
+    /// </summary>
+    public static IServiceCollection AddOdccActions(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<ActionFollowUpOptions>(configuration.GetSection(ActionFollowUpOptions.SectionName));
+        services.Configure<ActionEvidenceOptions>(configuration.GetSection(ActionEvidenceOptions.SectionName));
+        services.Configure<ActionAnalyticsOptions>(configuration.GetSection(ActionAnalyticsOptions.SectionName));
+
+        var enableFollowUp = configuration.GetValue<bool?>($"{ActionFollowUpOptions.SectionName}:EnableFollowUpScheduler") is true;
+
+        if (enableFollowUp)
+        {
+            services.AddHostedService<ActionFollowUpHostedService>();
+        }
+
+        return services;
     }
 
     /// <summary>

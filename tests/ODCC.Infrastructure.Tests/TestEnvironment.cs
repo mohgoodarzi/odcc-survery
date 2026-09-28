@@ -19,6 +19,7 @@ using ODCC.Application.Modules.Response.Abstractions;
 using ODCC.Application.Modules.Analytics.Abstractions;
 using ODCC.Application.Modules.Reporting.Abstractions;
 using ODCC.Application.Modules.Notification.Abstractions;
+using ODCC.Application.Modules.ActionManagement.Abstractions;
 using ODCC.Infrastructure.Modules.Audit.EventListeners;
 using ODCC.Infrastructure.Repositories.Audit;
 using ODCC.Infrastructure.Modules.Identity;
@@ -58,6 +59,10 @@ using ODCC.Infrastructure.Modules.Notification.EventListeners;
 using ODCC.Infrastructure.Modules.Notification.Persistence;
 using ODCC.Infrastructure.Modules.Notification.Repositories;
 using ODCC.Infrastructure.Modules.Notification.Services;
+using ODCC.Infrastructure.Modules.ActionManagement.EventListeners;
+using ODCC.Infrastructure.Modules.ActionManagement.Persistence;
+using ODCC.Infrastructure.Modules.ActionManagement.Repositories;
+using ODCC.Infrastructure.Modules.ActionManagement.Services;
 using ODCC.Infrastructure.Modules.Organization.Persistence;
 using ODCC.Infrastructure.Modules.Organization.Repositories;
 using ODCC.Infrastructure.Modules.Organization.Services;
@@ -89,6 +94,7 @@ public sealed class TestEnvironment : IAsyncDisposable
     public AnalyticsDbContext AnalyticsDbContext { get; }
     public ReportingDbContext ReportingDbContext { get; }
     public NotificationDbContext NotificationDbContext { get; }
+    public ActionManagementDbContext ActionManagementDbContext { get; }
 
     private readonly SqliteConnection _identityConnection;
     private readonly SqliteConnection _organizationConnection;
@@ -101,6 +107,8 @@ public sealed class TestEnvironment : IAsyncDisposable
     private readonly SqliteConnection _analyticsConnection;
     private readonly SqliteConnection _reportingConnection;
     private readonly SqliteConnection _notificationConnection;
+    private readonly SqliteConnection _actionManagementConnection;
+    private readonly string _evidenceRoot;
 
     private TestEnvironment(
         IServiceProvider services,
@@ -114,6 +122,7 @@ public sealed class TestEnvironment : IAsyncDisposable
         AnalyticsDbContext analyticsDbContext,
         ReportingDbContext reportingDbContext,
         NotificationDbContext notificationDbContext,
+        ActionManagementDbContext actionManagementDbContext,
         SqliteConnection identityConnection,
         SqliteConnection organizationConnection,
         SqliteConnection auditConnection,
@@ -124,7 +133,9 @@ public sealed class TestEnvironment : IAsyncDisposable
         SqliteConnection responseConnection,
         SqliteConnection analyticsConnection,
         SqliteConnection reportingConnection,
-        SqliteConnection notificationConnection)
+        SqliteConnection notificationConnection,
+        SqliteConnection actionManagementConnection,
+        string evidenceRoot)
     {
         Services = services;
         IdentityDbContext = identityDbContext;
@@ -137,6 +148,7 @@ public sealed class TestEnvironment : IAsyncDisposable
         AnalyticsDbContext = analyticsDbContext;
         ReportingDbContext = reportingDbContext;
         NotificationDbContext = notificationDbContext;
+        ActionManagementDbContext = actionManagementDbContext;
         _identityConnection = identityConnection;
         _organizationConnection = organizationConnection;
         _auditConnection = auditConnection;
@@ -148,6 +160,8 @@ public sealed class TestEnvironment : IAsyncDisposable
         _analyticsConnection = analyticsConnection;
         _reportingConnection = reportingConnection;
         _notificationConnection = notificationConnection;
+        _actionManagementConnection = actionManagementConnection;
+        _evidenceRoot = evidenceRoot;
     }
 
     /// <summary>
@@ -189,7 +203,14 @@ public sealed class TestEnvironment : IAsyncDisposable
         var notificationConnection = new SqliteConnection("DataSource=:memory:");
         await notificationConnection.OpenAsync();
 
+        var actionManagementConnection = new SqliteConnection("DataSource=:memory:");
+        await actionManagementConnection.OpenAsync();
+
         var services = new ServiceCollection();
+
+        // شاخه‌ی موقت برای انبار پیوست‌های اقدامات (در پایان آزمون پاک می‌شود).
+        var evidenceRoot = Path.Combine(Path.GetTempPath(), "odcc-action-evidence-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(evidenceRoot);
 
         // QuestPDF نیازمند اعلام نوع مجوز در زمان شروع است. در آزمون‌ها از
         // مجوز Community استفاده می‌شود (محیط غیرتولیدی).
@@ -230,6 +251,9 @@ public sealed class TestEnvironment : IAsyncDisposable
 
         services.AddDbContext<NotificationDbContext>(options =>
             options.UseSqlite(notificationConnection));
+
+        services.AddDbContext<ActionManagementDbContext>(options =>
+            options.UseSqlite(actionManagementConnection));
 
         services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
             {
@@ -308,6 +332,29 @@ public sealed class TestEnvironment : IAsyncDisposable
         services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Campaign.Events.CampaignLaunchedEvent>, CampaignNotificationEventListener>();
         services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Campaign.Events.ReminderDueEvent>, CampaignNotificationEventListener>();
 
+        // شنونده‌ی اعلان‌ها: انتصاب، یادآور، تشدید و تکمیل آیتم‌های اقدام.
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.ActionManagement.Events.ActionItemCreatedEvent>, ActionNotificationEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.ActionManagement.Events.ActionItemCompletedEvent>, ActionNotificationEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.ActionManagement.Events.ActionItemReminderDueEvent>, ActionNotificationEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.ActionManagement.Events.ActionItemEscalatedEvent>, ActionNotificationEventListener>();
+
+        // شنونده‌ی مدیریت اقدامات: هشدارهای تحلیلات را به برنامه‌ی اقدام تبدیل می‌کند.
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Analytics.Events.AnalyticsComputedEvent>, AnalyticsActionEventListener>();
+
+        // شنونده‌ی ممیزی برای رویدادهای مدیریت اقدامات.
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.ActionManagement.Events.ActionPlanCreatedEvent>, ActionManagementAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.ActionManagement.Events.ActionPlanUpdatedEvent>, ActionManagementAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.ActionManagement.Events.ActionPlanActivatedEvent>, ActionManagementAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.ActionManagement.Events.ActionPlanCompletedEvent>, ActionManagementAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.ActionManagement.Events.ActionPlanCancelledEvent>, ActionManagementAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.ActionManagement.Events.ActionPlanArchivedEvent>, ActionManagementAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.ActionManagement.Events.ActionItemCreatedEvent>, ActionManagementAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.ActionManagement.Events.ActionItemUpdatedEvent>, ActionManagementAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.ActionManagement.Events.ActionItemStatusChangedEvent>, ActionManagementAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.ActionManagement.Events.ActionItemEscalatedEvent>, ActionManagementAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.ActionManagement.Events.ActionCommentAddedEvent>, ActionManagementAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.ActionManagement.Events.ActionEvidenceUploadedEvent>, ActionManagementAuditEventListener>();
+
         services.AddScoped<IAuditEntryRepository, AuditEntryRepository>();
         services.AddScoped<IAuditService, AuditService>();
         services.AddScoped<IRefreshTokenStore, RefreshTokenStore>();
@@ -322,6 +369,7 @@ public sealed class TestEnvironment : IAsyncDisposable
         services.AddScoped<IAnalyticsUnitOfWork, AnalyticsUnitOfWork>();
         services.AddScoped<IReportingUnitOfWork, ReportingUnitOfWork>();
         services.AddScoped<INotificationUnitOfWork, NotificationUnitOfWork>();
+        services.AddScoped<IActionManagementUnitOfWork, ActionManagementUnitOfWork>();
 
         services.AddScoped<IOrgUnitRepository, OrgUnitRepository>();
         services.AddScoped<IPositionRepository, PositionRepository>();
@@ -385,6 +433,14 @@ public sealed class TestEnvironment : IAsyncDisposable
         // پیاده‌سازی پیش‌فرض و بدون اثر هوش مصنوعی — هیچ داده‌ای از سامانه خارج نمی‌شود.
         services.AddSingleton<IAnalyticsAiService, NoOpAnalyticsAiService>();
 
+        // ماژول مدیریت اقدامات: مخازن، سرویس و انبار پیوست‌ها (شاخه‌ی موقت).
+        services.AddScoped<IActionPlanRepository, ActionPlanRepository>();
+        services.AddScoped<IActionItemRepository, ActionItemRepository>();
+        services.AddScoped<IActionManagementService, ActionManagementService>();
+        services.AddSingleton(Options.Create(new ActionEvidenceOptions { RootPath = evidenceRoot }));
+        services.AddSingleton<IActionEvidenceStore, FileSystemActionEvidenceStore>();
+        services.AddSingleton(Options.Create(new ActionAnalyticsOptions()));
+
         // داده‌ی اولیه (bootstrap). رمز عبور آزمون هرگز در production نیست.
         services.AddSingleton(Options.Create(new SeedOptions
         {
@@ -412,6 +468,7 @@ public sealed class TestEnvironment : IAsyncDisposable
         var analyticsDbContext = provider.GetRequiredService<AnalyticsDbContext>();
         var reportingDbContext = provider.GetRequiredService<ReportingDbContext>();
         var notificationDbContext = provider.GetRequiredService<NotificationDbContext>();
+        var actionManagementDbContext = provider.GetRequiredService<ActionManagementDbContext>();
 
         await identityDbContext.Database.EnsureCreatedAsync();
         await organizationDbContext.Database.EnsureCreatedAsync();
@@ -424,13 +481,16 @@ public sealed class TestEnvironment : IAsyncDisposable
         await analyticsDbContext.Database.EnsureCreatedAsync();
         await reportingDbContext.Database.EnsureCreatedAsync();
         await notificationDbContext.Database.EnsureCreatedAsync();
+        await actionManagementDbContext.Database.EnsureCreatedAsync();
 
         return new TestEnvironment(provider, identityDbContext, organizationDbContext,
             questionBankDbContext, questionnaireDbContext, surveyDbContext, campaignDbContext,
             responseDbContext, analyticsDbContext, reportingDbContext, notificationDbContext,
+            actionManagementDbContext,
             identityConnection, organizationConnection, auditConnection,
             questionBankConnection, questionnaireConnection, surveyConnection, campaignConnection,
-            responseConnection, analyticsConnection, reportingConnection, notificationConnection);
+            responseConnection, analyticsConnection, reportingConnection, notificationConnection,
+            actionManagementConnection, evidenceRoot);
     }
 
     /// <summary>
@@ -537,6 +597,7 @@ public sealed class TestEnvironment : IAsyncDisposable
         await AnalyticsDbContext.DisposeAsync();
         await ReportingDbContext.DisposeAsync();
         await NotificationDbContext.DisposeAsync();
+        await ActionManagementDbContext.DisposeAsync();
         await _identityConnection.DisposeAsync();
         await _organizationConnection.DisposeAsync();
         await _auditConnection.DisposeAsync();
@@ -547,6 +608,22 @@ public sealed class TestEnvironment : IAsyncDisposable
         await _responseConnection.DisposeAsync();
         await _analyticsConnection.DisposeAsync();
         await _reportingConnection.DisposeAsync();
+        await _notificationConnection.DisposeAsync();
+        await _actionManagementConnection.DisposeAsync();
+
+        // پاک کردن شاخه‌ی موقت پیوست‌های اقدامات.
+        try
+        {
+            if (Directory.Exists(_evidenceRoot))
+            {
+                Directory.Delete(_evidenceRoot, recursive: true);
+            }
+        }
+        catch
+        {
+            // پاک‌سازی بهترین‌حالت است؛ نباید آزمون را شکست دهد.
+        }
+
         if (Services is IDisposable disposable)
         {
             disposable.Dispose();

@@ -59,5 +59,8 @@ public enum NotificationCategory
     Analytics = 3,
 
     /// <summary>آماده‌بودن یا شکست خروجی گزارش.</summary>
-    Reporting = 4
+    Reporting = 4,
+
+    /// <summary>برنامه‌های اقدام و پیگیری آن‌ها (انتصاب، یادآور، تشدید).</summary>
+    Action = 5
 }

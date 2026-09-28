@@ -9,6 +9,7 @@ using ODCC.Infrastructure.Modules.Campaign.Persistence;
 using ODCC.Infrastructure.Modules.Response.Persistence;
 using ODCC.Infrastructure.Modules.Analytics.Persistence;
 using ODCC.Infrastructure.Modules.Notification.Persistence;
+using ODCC.Infrastructure.Modules.ActionManagement.Persistence;
 using ODCC.Infrastructure.Modules.Reporting.Persistence;
 using ODCC.Infrastructure.Persistence.Common;
 
@@ -174,3 +175,9 @@ public sealed class ReportingUnitOfWork(ReportingDbContext context, IDomainEvent
 /// </summary>
 public sealed class NotificationUnitOfWork(NotificationDbContext context, IDomainEventDispatcher domainEventDispatcher)
     : UnitOfWork<NotificationDbContext>(context, domainEventDispatcher), INotificationUnitOfWork;
+
+/// <summary>
+/// مرز تراکنشی ماژول مدیریت اقدامات.
+/// </summary>
+public sealed class ActionManagementUnitOfWork(ActionManagementDbContext context, IDomainEventDispatcher domainEventDispatcher)
+    : UnitOfWork<ActionManagementDbContext>(context, domainEventDispatcher), IActionManagementUnitOfWork;
