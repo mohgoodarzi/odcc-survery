@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ODCC.Api.Authorization;
 using ODCC.Application.Abstractions;
 using ODCC.Application.Authorization;
@@ -173,6 +174,7 @@ public sealed class ReportsController(IReportingService reportingService) : Cont
     /// </summary>
     [HttpPost("{id:guid}/execute")]
     [HasPermission(Permissions.Reports.Export)]
+    [EnableRateLimiting("Critical")]
     [ProducesResponseType(typeof(ReportExecutionDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]

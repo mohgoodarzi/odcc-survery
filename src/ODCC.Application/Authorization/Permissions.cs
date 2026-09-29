@@ -137,6 +137,66 @@ public static class Permissions
         public const string Manage = "actions.manage";
     }
 
+    /// <summary>مجوزهای گردش کار و تأییدها.</summary>
+    public static class Workflows
+    {
+        public const string Group = "workflows";
+
+        /// <summary>مشاهده‌ی تعاریف، نمونه‌ها و درخواست‌های تأیید.</summary>
+        public const string View = "workflows.view";
+
+        /// <summary>ایجاد، ویرایش، فعال‌سازی و بایگانی تعاریف گردش کار.</summary>
+        public const string Manage = "workflows.manage";
+
+        /// <summary>
+        /// تأیید گذارهای نیازمند تأییدی که مجوز مشخصی روی گذار تعیین نشده است.
+        /// گذارهایی که مجوز صریح دارند، از همان مجوز استفاده می‌کنند.
+        /// </summary>
+        public const string Approve = "workflows.approve";
+    }
+
+    /// <summary>مجوزهای یکپارچه‌سازی‌های خارجی (وب‌هوک، همگام‌سازی HR، SSO).</summary>
+    public static class Integrations
+    {
+        public const string Group = "integrations";
+
+        /// <summary>مشاهده‌ی اندپوینت‌ها و تاریخچه‌ی تحویل وب‌هوک.</summary>
+        public const string View = "integrations.view";
+
+        /// <summary>ایجاد، ویرایش، فعال‌سازی و بایگانی اندپوینت‌ها.</summary>
+        public const string Manage = "integrations.manage";
+
+        /// <summary>تلاش مجدد دستی تحویل‌های ناموفق.</summary>
+        public const string Retry = "integrations.retry";
+    }
+
+    /// <summary>مجوزهای پیکربندی سامانه (تنظیمات، پرچم ویژگی، سیاست‌ها).</summary>
+    public static class System
+    {
+        public const string Group = "system";
+
+        /// <summary>مشاهده‌ی تنظیمات، پرچم‌های ویژگی و سیاست‌ها.</summary>
+        public const string View = "system.view";
+
+        /// <summary>تغییر تنظیمات، پرچم‌های ویژگی و سیاست‌های سیستمی.</summary>
+        public const string Manage = "system.manage";
+    }
+
+    /// <summary>مجوزهای مدیریت فایل‌ها و پیوست‌ها.</summary>
+    public static class Files
+    {
+        public const string Group = "files";
+
+        /// <summary>بارگذاری فایل (پیوست اقدام، گزارش و...).</summary>
+        public const string Upload = "files.upload";
+
+        /// <summary>دانلود فایل‌های مجاز.</summary>
+        public const string Download = "files.download";
+
+        /// <summary>مدیریت (حذف/بایگانی) فایل‌های سامانه.</summary>
+        public const string Manage = "files.manage";
+    }
+
     /// <summary>تمام مجوزهای تعریف‌شده. برای seed کردن نقش‌ها استفاده می‌شود.</summary>
     public static readonly IReadOnlyCollection<string> All =
     [
@@ -154,6 +214,10 @@ public static class Permissions
         Analytics.View, Analytics.DepartmentView, Analytics.CompanyView,
         Reports.View, Reports.Export,
         Notifications.View, Notifications.Manage,
-        Actions.View, Actions.Manage
+        Actions.View, Actions.Manage,
+        Workflows.View, Workflows.Manage, Workflows.Approve,
+        Integrations.View, Integrations.Manage, Integrations.Retry,
+        System.View, System.Manage,
+        Files.Upload, Files.Download, Files.Manage
     ];
 }

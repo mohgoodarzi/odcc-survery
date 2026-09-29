@@ -135,6 +135,19 @@ internal static class DefaultNotificationTemplates
                 [Language.En] = (
                     "Task \"{{action_title}}\" completed",
                     "The task \"{{action_title}}\" in action plan \"{{plan_title}}\" was completed by {{assignee_name}}.\n\nYou can assess its effectiveness in the \"Actions\" section.")
+            },
+
+            // --- گردش کار ----------------------------------------------------------
+            // این قالب فقط متادیتای عمومی گذار (کد گذار، وضعیت مبدا/مقصد) را
+            // حمل می‌کند — هرگز داده‌ی حساس.
+            ["workflow_approval_requested"] = new()
+            {
+                [Language.Fa] = (
+                    "درخواست تأیید: گذار «{{transition_code}}»",
+                    "سلام {{recipient_name}} عزیز،\n\nیک درخواست تأیید برای گذار «{{transition_code}}» (از «{{from_state}}» به «{{to_state}}») در انتظار تصمیم شماست.\nانقضا: {{expiry}}\n\nلطفاً از بخش «گردش کار» تصمیم خود را ثبت کنید."),
+                [Language.En] = (
+                    "Approval requested: transition \"{{transition_code}}\"",
+                    "Hello {{recipient_name}},\n\nAn approval is pending for transition \"{{transition_code}}\" (from \"{{from_state}}\" to \"{{to_state}}\").\nExpires: {{expiry}}\n\nPlease record your decision in the \"Workflow\" section.")
             }
         };
 

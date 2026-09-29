@@ -9,8 +9,13 @@ using ODCC.Infrastructure.Modules.Questionnaire.Persistence;
 using ODCC.Infrastructure.Modules.Survey.Persistence;
 using ODCC.Infrastructure.Modules.Campaign.Persistence;
 using ODCC.Infrastructure.Modules.Response.Persistence;
+using ODCC.Infrastructure.Modules.Analytics.Persistence;
 using ODCC.Infrastructure.Modules.Reporting.Persistence;
 using ODCC.Infrastructure.Modules.Notification.Persistence;
+using ODCC.Infrastructure.Modules.ActionManagement.Persistence;
+using ODCC.Infrastructure.Modules.Workflow.Persistence;
+using ODCC.Infrastructure.Modules.Integration.Persistence;
+using ODCC.Infrastructure.Modules.SystemConfiguration.Persistence;
 using ODCC.Infrastructure.Persistence.Audit;
 
 namespace ODCC.Infrastructure.Persistence;
@@ -72,8 +77,13 @@ public sealed class OdccDbInitializerHostedService(
                 await MigrateContextAsync<SurveyDbContext>(provider, cancellationToken);
                 await MigrateContextAsync<CampaignDbContext>(provider, cancellationToken);
                 await MigrateContextAsync<ResponseDbContext>(provider, cancellationToken);
+                await MigrateContextAsync<AnalyticsDbContext>(provider, cancellationToken);
                 await MigrateContextAsync<ReportingDbContext>(provider, cancellationToken);
                 await MigrateContextAsync<NotificationDbContext>(provider, cancellationToken);
+                await MigrateContextAsync<ActionManagementDbContext>(provider, cancellationToken);
+                await MigrateContextAsync<WorkflowDbContext>(provider, cancellationToken);
+                await MigrateContextAsync<IntegrationDbContext>(provider, cancellationToken);
+                await MigrateContextAsync<SystemConfigurationDbContext>(provider, cancellationToken);
             }
             catch (Exception ex)
             {

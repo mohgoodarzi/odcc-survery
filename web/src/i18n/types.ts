@@ -41,6 +41,14 @@ export interface Dictionary {
     mySurveys: string;
     responses: string;
     actions: string;
+    workflows: string;
+    instances: string;
+    approvals: string;
+    integrations: string;
+    deliveries: string;
+    systemSettings: string;
+    featureFlags: string;
+    systemPolicies: string;
   };
   common: {
     search: string;
@@ -884,5 +892,351 @@ export interface Dictionary {
     errorSameStatus: string;
     /** حریم خصوصی. */
     privacyNote: string;
+  };
+  workflows: {
+    title: string;
+    description: string;
+    /** جستجو و فیلتر. */
+    searchPlaceholder: string;
+    includeArchived: string;
+    pendingOnly: string;
+    approvableByMe: string;
+    runningOnly: string;
+    /** برچسب ستون‌ها. */
+    definition: string;
+    instance: string;
+    instances: string;
+    approval: string;
+    approvals: string;
+    code: string;
+    name: string;
+    entityType: string;
+    status: string;
+    version: string;
+    states: string;
+    transitions: string;
+    currentState: string;
+    transitionCount: string;
+    startedAt: string;
+    completedAt: string;
+    cancelledAt: string;
+    startedBy: string;
+    createdBy: string;
+    createdAt: string;
+    requestedAt: string;
+    decidedAt: string;
+    decidedBy: string;
+    expiresAt: string;
+    note: string;
+    fromState: string;
+    toState: string;
+    approverPermission: string;
+    requiresApproval: string;
+    nextTransitions: string;
+    /** دیالوگ تعریف. */
+    newWorkflow: string;
+    editWorkflow: string;
+    workflowName: string;
+    workflowDescription: string;
+    activateImmediately: string;
+    activateImmediatelyHint: string;
+    addState: string;
+    removeState: string;
+    addTransition: string;
+    removeTransition: string;
+    stateCode: string;
+    stateName: string;
+    isInitial: string;
+    isFinal: string;
+    displayOrder: string;
+    transitionCode: string;
+    transitionName: string;
+    selectFromState: string;
+    selectToState: string;
+    initialStateRequired: string;
+    /** اکشن‌ها. */
+    activate: string;
+    archive: string;
+    cancel: string;
+    approve: string;
+    reject: string;
+    decide: string;
+    /** آمار. */
+    statsTotalWorkflows: string;
+    statsActiveWorkflows: string;
+    statsRunningInstances: string;
+    statsCompletedInstances: string;
+    statsPendingApprovals: string;
+    /** پیام‌های موفقیت. */
+    workflowCreated: string;
+    workflowUpdated: string;
+    workflowActivated: string;
+    workflowArchived: string;
+    approvalDecided: string;
+    /** تأییدها. */
+    archiveConfirmTitle: string;
+    archiveConfirmDescription: string;
+    cancelConfirmTitle: string;
+    cancelConfirmDescription: string;
+    approveConfirmTitle: string;
+    approveConfirmDescription: string;
+    rejectConfirmTitle: string;
+    rejectConfirmDescription: string;
+    decisionNote: string;
+    decisionNoteHint: string;
+    approvalExpiry: string;
+    approvalExpiryHint: string;
+    /** حالت‌های خالی. */
+    noWorkflows: string;
+    noWorkflowsDescription: string;
+    noInstances: string;
+    noInstancesDescription: string;
+    noApprovals: string;
+    noApprovalsDescription: string;
+    /** برچسب‌های چرخه‌ی عمر. */
+    statusDraft: string;
+    statusActive: string;
+    statusArchived: string;
+    instanceRunning: string;
+    instanceCompleted: string;
+    instanceCancelled: string;
+    instanceFailed: string;
+    approvalPending: string;
+    approvalApproved: string;
+    approvalRejected: string;
+    approvalCancelled: string;
+    approvalExpired: string;
+    /** انواع موجودیت. */
+    entitySurvey: string;
+    entityCampaign: string;
+    entityActionPlan: string;
+    entityReportDefinition: string;
+    entityCustom: string;
+    /** کدهای خطای سمت سرور. */
+    errorWorkflowNotFound: string;
+    errorWorkflowArchived: string;
+    errorInstanceNotFound: string;
+    errorApprovalNotFound: string;
+    errorInvalidTransition: string;
+    errorWorkflowNotActive: string;
+    errorApprovalNotPending: string;
+    errorApproverNotAuthorized: string;
+  };
+  integrations: {
+    title: string;
+    description: string;
+    /** جستجو و فیلتر. */
+    searchPlaceholder: string;
+    includeArchived: string;
+    retryableOnly: string;
+    /** برچسب ستون‌ها. */
+    endpoint: string;
+    delivery: string;
+    deliveries: string;
+    code: string;
+    name: string;
+    type: string;
+    url: string;
+    httpMethod: string;
+    authType: string;
+    secretRef: string;
+    secretConfigured: string;
+    secretMissing: string;
+    authHeaderName: string;
+    isActive: string;
+    timeoutSeconds: string;
+    maxRetries: string;
+    subscribedEvents: string;
+    eventType: string;
+    eventId: string;
+    status: string;
+    attemptCount: string;
+    lastAttemptAt: string;
+    nextAttemptAt: string;
+    deliveredAt: string;
+    responseStatusCode: string;
+    lastError: string;
+    createdAt: string;
+    lastDeliveryAt: string;
+    successfulDeliveries: string;
+    payload: string;
+    /** دیالوگ اندپوینت. */
+    newEndpoint: string;
+    editEndpoint: string;
+    endpointName: string;
+    endpointDescription: string;
+    activateImmediately: string;
+    activateImmediatelyHint: string;
+    subscribedEventsHint: string;
+    /** مسیر وب‌هوک ورودی. */
+    inboundUrl: string;
+    inboundUrlHint: string;
+    /** اکشن‌ها. */
+    activate: string;
+    deactivate: string;
+    archive: string;
+    testConnection: string;
+    testing: string;
+    retry: string;
+    /** آمار. */
+    statsTotalEndpoints: string;
+    statsActiveEndpoints: string;
+    statsPendingDeliveries: string;
+    statsFailedDeliveries: string;
+    statsSuccessfulDeliveries: string;
+    /** پیام‌های موفقیت. */
+    endpointCreated: string;
+    endpointUpdated: string;
+    endpointActivated: string;
+    endpointDeactivated: string;
+    endpointArchived: string;
+    deliveryRetried: string;
+    /** تأییدها. */
+    archiveConfirmTitle: string;
+    archiveConfirmDescription: string;
+    deactivateConfirmTitle: string;
+    deactivateConfirmDescription: string;
+    retryConfirmTitle: string;
+    retryConfirmDescription: string;
+    testResultTitle: string;
+    testResultSuccess: string;
+    testResultFailure: string;
+    testPayload: string;
+    testPayloadHint: string;
+    /** حالت‌های خالی. */
+    noEndpoints: string;
+    noEndpointsDescription: string;
+    noDeliveries: string;
+    noDeliveriesDescription: string;
+    /** برچسب‌های وضعیت. */
+    statusPending: string;
+    statusSucceeded: string;
+    statusFailed: string;
+    /** انواع یکپارچه‌سازی. */
+    typeOutboundWebhook: string;
+    typeInboundWebhook: string;
+    typeHrSync: string;
+    typeSso: string;
+    typeAiProvider: string;
+    /** انواع احراز هویت. */
+    authNone: string;
+    authHmac: string;
+    authBearer: string;
+    authApiKey: string;
+    authBasic: string;
+    /** کدهای خطای سمت سرور. */
+    errorEndpointNotFound: string;
+    errorEndpointArchived: string;
+    errorDeliveryNotFound: string;
+    errorDeliveryNotRetryable: string;
+    errorSecretNotConfigured: string;
+    errorSignatureInvalid: string;
+    /** حریم خصوصی. */
+    privacyNote: string;
+    secretNote: string;
+  };
+  system: {
+    title: string;
+    description: string;
+    /** تنظیمات. */
+    settingsTitle: string;
+    settingsDescription: string;
+    newSetting: string;
+    settingKey: string;
+    settingName: string;
+    settingValue: string;
+    settingDefaultValue: string;
+    valueType: string;
+    settingGroup: string;
+    isSensitive: string;
+    isSensitiveHint: string;
+    isReadOnly: string;
+    hasValue: string;
+    sensitiveValueHidden: string;
+    lastModifiedBy: string;
+    updatedAt: string;
+    noSettings: string;
+    noSettingsDescription: string;
+    settingCreated: string;
+    settingUpdated: string;
+    /** پرچم‌های ویژگی. */
+    featureFlagsTitle: string;
+    featureFlagsDescription: string;
+    newFeatureFlag: string;
+    flagKey: string;
+    flagName: string;
+    flagState: string;
+    percentage: string;
+    allowedUsers: string;
+    allowedRoles: string;
+    expiresAt: string;
+    flagIsEnabled: string;
+    turnOn: string;
+    turnOff: string;
+    allowedUsersHint: string;
+    allowedRolesHint: string;
+    percentageHint: string;
+    noFeatureFlags: string;
+    noFeatureFlagsDescription: string;
+    featureFlagCreated: string;
+    featureFlagUpdated: string;
+    featureFlagTurnedOn: string;
+    featureFlagTurnedOff: string;
+    /** سیاست‌های سیستمی. */
+    policiesTitle: string;
+    policiesDescription: string;
+    newPolicy: string;
+    policyType: string;
+    policyKey: string;
+    policyName: string;
+    policyValue: string;
+    policyDefaultValue: string;
+    policyIsEnabled: string;
+    noPolicies: string;
+    noPoliciesDescription: string;
+    policyCreated: string;
+    policyUpdated: string;
+    /** آمار. */
+    statsTotalSettings: string;
+    statsSensitiveSettings: string;
+    statsTotalFeatureFlags: string;
+    statsEnabledFeatureFlags: string;
+    statsTotalPolicies: string;
+    statsEnabledPolicies: string;
+    /** برچسب‌های نوع مقدار. */
+    valueText: string;
+    valueWholeNumber: string;
+    valueFractionalNumber: string;
+    valueTrueFalse: string;
+    valueDate: string;
+    valueEmail: string;
+    valueUrl: string;
+    valueDuration: string;
+    valueJson: string;
+    /** برچسب‌های دامنه. */
+    scopeSystem: string;
+    scopeOrganization: string;
+    /** برچسب‌های وضعیت پرچم. */
+    flagOff: string;
+    flagOn: string;
+    flagPercentage: string;
+    flagAllowList: string;
+    /** برچسب‌های نوع سیاست. */
+    policyPassword: string;
+    policySession: string;
+    policyResponsePrivacy: string;
+    policyDataRetention: string;
+    policyLoginSecurity: string;
+    policyCustom: string;
+    /** کدهای خطای سمت سرور. */
+    errorSettingNotFound: string;
+    errorSettingExists: string;
+    errorFeatureFlagNotFound: string;
+    errorFeatureFlagExists: string;
+    errorPolicyNotFound: string;
+    errorPolicyExists: string;
+    errorSettingReadOnly: string;
+    /** امنیت. */
+    securityNote: string;
   };
 }

@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
+using Microsoft.AspNetCore.RateLimiting;
 using ODCC.Api.Authorization;
 using ODCC.Application.Abstractions;
 using ODCC.Application.Authorization;
@@ -38,6 +40,8 @@ public sealed class ActionPlansController(IActionManagementService actionManagem
     /// <summary>خلاصه‌ی آماری اقدامات برای داشبورد (با احترام به دامنه‌ی سازمانی).</summary>
     [HttpGet("stats")]
     [HasPermission(Permissions.Actions.View)]
+    [EnableRateLimiting("Critical")]
+    [OutputCache(PolicyName = "Dashboard")]
     [ProducesResponseType(typeof(ActionStatsDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<ActionStatsDto>> GetStats(CancellationToken ct)
     {

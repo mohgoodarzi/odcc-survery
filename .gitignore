@@ -30,3 +30,4 @@ logs/
 
 # Build artifacts
 TestResults/
+.build.exit

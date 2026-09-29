@@ -25,6 +25,14 @@ import { BenchmarksPage } from '@/routes/analytics/BenchmarksPage';
 import { ReportsPage } from '@/routes/reports/ReportsPage';
 import { ActionPlansPage } from '@/routes/actions/ActionPlansPage';
 import { ActionItemsPage } from '@/routes/actions/ActionItemsPage';
+import { WorkflowsPage } from '@/routes/workflow/WorkflowsPage';
+import { WorkflowInstancesPage } from '@/routes/workflow/WorkflowInstancesPage';
+import { WorkflowApprovalsPage } from '@/routes/workflow/WorkflowApprovalsPage';
+import { IntegrationEndpointsPage } from '@/routes/integration/IntegrationEndpointsPage';
+import { WebhookDeliveriesPage } from '@/routes/integration/WebhookDeliveriesPage';
+import { SystemSettingsPage } from '@/routes/system/SystemSettingsPage';
+import { FeatureFlagsPage } from '@/routes/system/FeatureFlagsPage';
+import { SystemPoliciesPage } from '@/routes/system/SystemPoliciesPage';
 
 /**
  * مسیرها با پیشوند فرهنگ هستند: /fa/dashboard , /en/surveys ...
@@ -193,6 +201,76 @@ export function AppRoutes() {
         element={
           <RequireAuth permissions={[Permissions.Actions.View]}>
             <ActionItemsPage />
+          </RequireAuth>
+        }
+      />
+
+      {/* گردش کار و تأییدها */}
+      <Route
+        path="/:culture/workflows"
+        element={
+          <RequireAuth permissions={[Permissions.Workflows.View]}>
+            <WorkflowsPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/:culture/workflow-instances"
+        element={
+          <RequireAuth permissions={[Permissions.Workflows.View]}>
+            <WorkflowInstancesPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/:culture/approvals"
+        element={
+          <RequireAuth permissions={[Permissions.Workflows.View]}>
+            <WorkflowApprovalsPage />
+          </RequireAuth>
+        }
+      />
+
+      {/* یکپارچه‌سازی‌ها */}
+      <Route
+        path="/:culture/integrations/endpoints"
+        element={
+          <RequireAuth permissions={[Permissions.Integrations.View]}>
+            <IntegrationEndpointsPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/:culture/integrations/deliveries"
+        element={
+          <RequireAuth permissions={[Permissions.Integrations.View]}>
+            <WebhookDeliveriesPage />
+          </RequireAuth>
+        }
+      />
+
+      {/* پیکربندی سامانه */}
+      <Route
+        path="/:culture/system/settings"
+        element={
+          <RequireAuth permissions={[Permissions.System.View]}>
+            <SystemSettingsPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/:culture/system/feature-flags"
+        element={
+          <RequireAuth permissions={[Permissions.System.View]}>
+            <FeatureFlagsPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/:culture/system/policies"
+        element={
+          <RequireAuth permissions={[Permissions.System.View]}>
+            <SystemPoliciesPage />
           </RequireAuth>
         }
       />

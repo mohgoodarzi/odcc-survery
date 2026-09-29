@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ODCC.Application.Authorization;
 using ODCC.Application.Modules.Identity.Abstractions;
 using ODCC.Application.Modules.Identity.Dtos;
@@ -29,6 +30,7 @@ public sealed class AuthController(
     /// </summary>
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting("Public")]
     [ProducesResponseType(typeof(LoginResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<LoginResult>> Login(
@@ -59,6 +61,7 @@ public sealed class AuthController(
     /// </summary>
     [HttpPost("refresh")]
     [AllowAnonymous]
+    [EnableRateLimiting("Public")]
     [ProducesResponseType(typeof(TokenResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<TokenResponse>> Refresh(
@@ -105,6 +108,7 @@ public sealed class AuthController(
     /// </summary>
     [HttpPost("validate")]
     [AllowAnonymous]
+    [EnableRateLimiting("Public")]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public IActionResult Validate([FromBody] ValidateTokenRequest request)

@@ -62,5 +62,8 @@ public enum NotificationCategory
     Reporting = 4,
 
     /// <summary>برنامه‌های اقدام و پیگیری آن‌ها (انتصاب، یادآور، تشدید).</summary>
-    Action = 5
+    Action = 5,
+
+    /// <summary>درخواست‌های تأیید و گذارهای گردش کار.</summary>
+    Workflow = 6
 }

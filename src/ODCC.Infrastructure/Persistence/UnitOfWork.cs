@@ -11,6 +11,12 @@ using ODCC.Infrastructure.Modules.Analytics.Persistence;
 using ODCC.Infrastructure.Modules.Notification.Persistence;
 using ODCC.Infrastructure.Modules.ActionManagement.Persistence;
 using ODCC.Infrastructure.Modules.Reporting.Persistence;
+using ODCC.Infrastructure.Modules.Workflow.Persistence;
+using ODCC.Infrastructure.Modules.Integration.Persistence;
+using ODCC.Infrastructure.Modules.SystemConfiguration.Persistence;
+using ODCC.Application.Modules.Workflow.Abstractions;
+using ODCC.Application.Modules.Integration.Abstractions;
+using ODCC.Application.Modules.SystemConfiguration.Abstractions;
 using ODCC.Infrastructure.Persistence.Common;
 
 namespace ODCC.Infrastructure.Persistence;
@@ -181,3 +187,21 @@ public sealed class NotificationUnitOfWork(NotificationDbContext context, IDomai
 /// </summary>
 public sealed class ActionManagementUnitOfWork(ActionManagementDbContext context, IDomainEventDispatcher domainEventDispatcher)
     : UnitOfWork<ActionManagementDbContext>(context, domainEventDispatcher), IActionManagementUnitOfWork;
+
+/// <summary>
+/// مرز تراکنشی ماژول گردش کار.
+/// </summary>
+public sealed class WorkflowUnitOfWork(WorkflowDbContext context, IDomainEventDispatcher domainEventDispatcher)
+    : UnitOfWork<WorkflowDbContext>(context, domainEventDispatcher), IWorkflowUnitOfWork;
+
+/// <summary>
+/// مرز تراکنشی ماژول یکپارچه‌سازی.
+/// </summary>
+public sealed class IntegrationUnitOfWork(IntegrationDbContext context, IDomainEventDispatcher domainEventDispatcher)
+    : UnitOfWork<IntegrationDbContext>(context, domainEventDispatcher), IIntegrationUnitOfWork;
+
+/// <summary>
+/// مرز تراکنشی ماژول پیکربندی سامانه.
+/// </summary>
+public sealed class SystemConfigurationUnitOfWork(SystemConfigurationDbContext context, IDomainEventDispatcher domainEventDispatcher)
+    : UnitOfWork<SystemConfigurationDbContext>(context, domainEventDispatcher), ISystemConfigurationUnitOfWork;

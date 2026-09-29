@@ -21,11 +21,28 @@ using ODCC.Application.Modules.Analytics.Abstractions;
 using ODCC.Application.Modules.Reporting.Abstractions;
 using ODCC.Application.Modules.Notification.Abstractions;
 using ODCC.Application.Modules.ActionManagement.Abstractions;
+using ODCC.Application.Modules.Workflow.Abstractions;
+using ODCC.Application.Modules.Integration.Abstractions;
+using ODCC.Application.Modules.SystemConfiguration.Abstractions;
 using ODCC.Infrastructure.Modules.ActionManagement.EventListeners;
 using ODCC.Infrastructure.Modules.ActionManagement.Persistence;
 using ODCC.Infrastructure.Modules.ActionManagement.Repositories;
 using ODCC.Infrastructure.Modules.ActionManagement.Scheduled;
 using ODCC.Infrastructure.Modules.ActionManagement.Services;
+using ODCC.Infrastructure.Modules.Workflow.EventListeners;
+using ODCC.Infrastructure.Modules.Workflow.Persistence;
+using ODCC.Infrastructure.Modules.Workflow.Repositories;
+using ODCC.Infrastructure.Modules.Workflow.Scheduled;
+using ODCC.Infrastructure.Modules.Workflow.Services;
+using ODCC.Infrastructure.Modules.Integration.EventListeners;
+using ODCC.Infrastructure.Modules.Integration.Persistence;
+using ODCC.Infrastructure.Modules.Integration.Repositories;
+using ODCC.Infrastructure.Modules.Integration.Scheduled;
+using ODCC.Infrastructure.Modules.Integration.Services;
+using ODCC.Infrastructure.Modules.SystemConfiguration.EventListeners;
+using ODCC.Infrastructure.Modules.SystemConfiguration.Persistence;
+using ODCC.Infrastructure.Modules.SystemConfiguration.Repositories;
+using ODCC.Infrastructure.Modules.SystemConfiguration.Services;
 using ODCC.Infrastructure.Modules.Audit.EventListeners;
 using ODCC.Infrastructure.Modules.Identity;
 using ODCC.Infrastructure.Modules.Identity.Entities;
@@ -74,6 +91,8 @@ using ODCC.Infrastructure.Persistence;
 using ODCC.Infrastructure.Persistence.Audit;
 using ODCC.Infrastructure.Repositories.Audit;
 using ODCC.Infrastructure.Services;
+using ODCC.Application.Modules.FileStorage.Abstractions;
+using ODCC.Infrastructure.Modules.FileStorage.Services;
 
 namespace ODCC.Infrastructure;
 
@@ -216,6 +235,48 @@ public static class DependencyInjection
         services.AddScoped<IDomainEventListener<Domain.Modules.ActionManagement.Events.ActionCommentAddedEvent>, ActionManagementAuditEventListener>();
         services.AddScoped<IDomainEventListener<Domain.Modules.ActionManagement.Events.ActionEvidenceUploadedEvent>, ActionManagementAuditEventListener>();
 
+        // شنونده‌ی ممیزی برای رویدادهای گردش کار: ایجاد/ویرایش/فعال‌سازی/بایگانی
+        // تعاریف، شروع/گذار/تکمیل/لغو نمونه‌ها و درخواست‌های تأیید.
+        services.AddScoped<IDomainEventListener<Domain.Modules.Workflow.Events.WorkflowCreatedEvent>, WorkflowAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Workflow.Events.WorkflowUpdatedEvent>, WorkflowAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Workflow.Events.WorkflowActivatedEvent>, WorkflowAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Workflow.Events.WorkflowArchivedEvent>, WorkflowAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Workflow.Events.WorkflowInstanceStartedEvent>, WorkflowAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Workflow.Events.WorkflowInstanceTransitionedEvent>, WorkflowAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Workflow.Events.WorkflowInstanceCompletedEvent>, WorkflowAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Workflow.Events.WorkflowInstanceCancelledEvent>, WorkflowAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Workflow.Events.WorkflowApprovalRequestedEvent>, WorkflowAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Workflow.Events.WorkflowApprovalDecidedEvent>, WorkflowAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Workflow.Events.WorkflowApprovalExpiredEvent>, WorkflowAuditEventListener>();
+
+        // شنونده‌ی اعلان‌ها: درخواست‌های تأیید گردش کار را به کاربرانی که مجوز
+        // تأیید دارند تبدیل به پیام می‌کند. این شنونده در ماژول اعلان‌ها ثبت
+        // می‌شود چون موجودیت‌های ساخته‌شده (Notification) متعلق به آن ماژول است.
+        services.AddScoped<IDomainEventListener<Domain.Modules.Workflow.Events.WorkflowApprovalRequestedEvent>, WorkflowNotificationEventListener>();
+
+        // شنونده‌ی یکپارچه‌سازی: رویدادهای قابل‌اشتراک‌گذاری را به وب‌هوک‌های
+        // فعال تحویل می‌دهد. این شنونده در ماژول یکپارچه‌سازی ثبت می‌شود چون
+        // موجودیت‌های ساخته‌شده (WebhookDelivery) متعلق به آن ماژول است.
+        services.AddScoped<IDomainEventListener<Domain.Modules.Analytics.Events.AnalyticsComputedEvent>, IntegrationWebhookEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Response.Events.ResponseSubmittedEvent>, IntegrationWebhookEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Workflow.Events.WorkflowInstanceTransitionedEvent>, IntegrationWebhookEventListener>();
+
+        // شنونده‌ی ممیزی برای رویدادهای یکپارچه‌سازی: ایجاد/ویرایش/فعال‌سازی
+        // اندپوینت‌ها و تحویل/شکست وب‌هوک.
+        services.AddScoped<IDomainEventListener<Domain.Modules.Integration.Events.IntegrationEndpointCreatedEvent>, IntegrationAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Integration.Events.IntegrationEndpointUpdatedEvent>, IntegrationAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Integration.Events.IntegrationEndpointActivatedEvent>, IntegrationAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Integration.Events.IntegrationEndpointArchivedEvent>, IntegrationAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Integration.Events.WebhookDeliveredEvent>, IntegrationAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Integration.Events.WebhookDeliveryFailedEvent>, IntegrationAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.Integration.Events.InboundWebhookReceivedEvent>, IntegrationAuditEventListener>();
+
+        // شنونده‌ی ممیزی برای رویدادهای پیکربندی سامانه: تغییر تنظیمات، پرچم‌های
+        // ویژگی و سیاست‌های سیستمی.
+        services.AddScoped<IDomainEventListener<Domain.Modules.SystemConfiguration.Events.SettingChangedEvent>, SystemConfigurationAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.SystemConfiguration.Events.FeatureFlagChangedEvent>, SystemConfigurationAuditEventListener>();
+        services.AddScoped<IDomainEventListener<Domain.Modules.SystemConfiguration.Events.SystemPolicyChangedEvent>, SystemConfigurationAuditEventListener>();
+
         ConfigureAudit(services, connectionString, configure);
         ConfigureIdentity(services, connectionString, configure);
         ConfigureOrganization(services, connectionString, configure);
@@ -228,6 +289,9 @@ public static class DependencyInjection
         ConfigureReporting(services, connectionString, configure);
         ConfigureNotification(services, connectionString, configure);
         ConfigureActionManagement(services, connectionString, configure);
+        ConfigureWorkflow(services, connectionString, configure);
+        ConfigureIntegration(services, connectionString, configure);
+        ConfigureSystemConfiguration(services, connectionString, configure);
 
         return services;
     }
@@ -704,6 +768,143 @@ public static class DependencyInjection
         return services;
     }
 
+    /// <summary>
+    /// راه‌اندازی بخش پیکربندی ماژول گردش کار: زمان‌بند انقضای درخواست‌های تأیید.
+    ///
+    /// طبق سیاست پروژه، پردازش پس‌زمینه یک اثر جانبی است و فقط با تأیید صریح
+    /// (<c>Workflows:EnableApprovalExpiryScheduler</c>) فعال می‌شود.
+    /// </summary>
+    public static IServiceCollection AddOdccWorkflow(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<WorkflowSchedulerOptions>(configuration.GetSection(WorkflowSchedulerOptions.SectionName));
+
+        var enableScheduler = configuration.GetValue<bool?>($"{WorkflowSchedulerOptions.SectionName}:EnableApprovalExpiryScheduler") is true;
+
+        if (enableScheduler)
+        {
+            services.AddHostedService<WorkflowApprovalExpiryHostedService>();
+        }
+
+        return services;
+    }
+
+    /// <summary>
+    /// راه‌اندازی بخش پیکربندی ماژول یکپارچه‌سازی: وب‌هوک‌های خروجی،
+    /// زمان‌بند تحویل مجدد و رمزنگاری/تأیید امضا.
+    ///
+    /// طبق سیاست پروژه، پردازش پس‌زمینه یک اثر جانبی است و فقط با تأیید صریح
+    /// (<c>Integrations:EnableDeliveryScheduler</c>) فعال می‌شود. تحویل
+    /// بلافاصله (در همان رویداد) همیشه فعال است.
+    /// </summary>
+    public static IServiceCollection AddOdccIntegrations(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<IntegrationOptions>(configuration.GetSection(IntegrationOptions.SectionName));
+        services.Configure<WebhookDeliveryOptions>(configuration.GetSection(WebhookDeliveryOptions.SectionName));
+
+        // کلاینت HTTP اختصاصی برای تماس با اندپوینت‌های خارجی: مهلت زمانی
+        // قابل پیکربندی و بدون بازگرداندن استثنا در شکست (پاسخ برمی‌گردد).
+        services.AddHttpClient(IntegrationHttpClientName)
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                PooledConnectionLifetime = TimeSpan.FromMinutes(2)
+            })
+            .SetHandlerLifetime(TimeSpan.FromMinutes(5));
+
+        // امضای وب‌هوک با HMAC-SHA256.
+        services.AddSingleton<IWebhookSigner, HmacWebhookSigner>();
+
+        // خواندن رازها از پیکربندی ایمن (user secrets / متغیرهای محیطی).
+        services.AddSingleton<ISecretResolver, ConfigurationSecretResolver>();
+
+        var enableScheduler = configuration.GetValue<bool?>($"{WebhookDeliveryOptions.SectionName}:EnableDeliveryScheduler") is true;
+
+        if (enableScheduler)
+        {
+            services.AddHostedService<WebhookDeliveryHostedService>();
+        }
+
+        return services;
+    }
+
+    /// <summary>
+    /// راه‌اندازی بخش پیکربندی ماژول پیکربندی سامانه: کش پرچم‌های ویژگی.
+    ///
+    /// <b>توجه:</b> پیاده‌سازی‌های کش‌شده‌ی <see cref="IFeatureFlagService"/> و
+    /// <see cref="ISettingService"/> در <see cref="ConfigureSystemConfiguration"/> به‌صورت
+    /// Scoped ثبت می‌شوند چون به مخازن Scoped (و در نتیجه DbContext Scoped) وابسته‌اند.
+    /// ثبت مجدد آن‌ها به‌صورت Singleton در اینجا باعث وابستگی اسیر (captive dependency)
+    /// می‌شود: یک DbContext کهScoped است در یک Singleton اسیر شده، هرگز dispose نمی‌شود
+    /// و به‌صورت همزمان بین درخواست‌ها استفاده می‌شود که EF Core از آن پشتیبانی
+    /// نمی‌کند. بنابراین در اینجا فقط گزینه‌ها پیکربندی می‌شوند.
+    /// </summary>
+    public static IServiceCollection AddOdccSystemConfiguration(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<SystemConfigurationOptions>(configuration.GetSection(SystemConfigurationOptions.SectionName));
+
+        return services;
+    }
+
+    /// <summary>نام کلاینت HTTP ماژول یکپارچه‌سازی (برای تزریق <c>IHttpClientFactory</c>).</summary>
+    public const string IntegrationHttpClientName = "odcc-integrations";
+
+    private static void ConfigureWorkflow(
+        IServiceCollection services,
+        string connectionString,
+        Action<DbContextOptionsBuilder>? configure)
+    {
+        services.AddDbContext<WorkflowDbContext>(options =>
+        {
+            ConfigureSql(options, connectionString);
+            configure?.Invoke(options);
+        });
+
+        services.AddScoped<IWorkflowRepository, WorkflowRepository>();
+        services.AddScoped<IWorkflowInstanceRepository, WorkflowInstanceRepository>();
+        services.AddScoped<IWorkflowApprovalRepository, WorkflowApprovalRepository>();
+        services.AddScoped<IWorkflowService, WorkflowService>();
+        services.AddScoped<IWorkflowUnitOfWork, WorkflowUnitOfWork>();
+    }
+
+    private static void ConfigureIntegration(
+        IServiceCollection services,
+        string connectionString,
+        Action<DbContextOptionsBuilder>? configure)
+    {
+        services.AddDbContext<IntegrationDbContext>(options =>
+        {
+            ConfigureSql(options, connectionString);
+            configure?.Invoke(options);
+        });
+
+        services.AddScoped<IIntegrationEndpointRepository, IntegrationEndpointRepository>();
+        services.AddScoped<IWebhookDeliveryRepository, WebhookDeliveryRepository>();
+        services.AddScoped<IIntegrationService, IntegrationService>();
+        services.AddScoped<IWebhookDispatcher, WebhookDispatcher>();
+        services.AddScoped<IIntegrationUnitOfWork, IntegrationUnitOfWork>();
+    }
+
+    private static void ConfigureSystemConfiguration(
+        IServiceCollection services,
+        string connectionString,
+        Action<DbContextOptionsBuilder>? configure)
+    {
+        services.AddDbContext<SystemConfigurationDbContext>(options =>
+        {
+            ConfigureSql(options, connectionString);
+            configure?.Invoke(options);
+        });
+
+        services.AddScoped<ISettingRepository, SettingRepository>();
+        services.AddScoped<IFeatureFlagRepository, FeatureFlagRepository>();
+        services.AddScoped<ISystemPolicyRepository, SystemPolicyRepository>();
+        services.AddScoped<ISystemConfigurationService, SystemConfigurationService>();
+        services.AddScoped<ISystemConfigurationUnitOfWork, SystemConfigurationUnitOfWork>();
+        services.AddScoped<IFeatureFlagService, CachedFeatureFlagService>();
+        services.AddScoped<ISettingService, CachedSettingService>();
+
+        services.AddMemoryCache();
+    }
+
     private static void ConfigureSql(DbContextOptionsBuilder options, string connectionString)
     {
         options.UseSqlServer(connectionString, sql =>
@@ -711,5 +912,43 @@ public static class DependencyInjection
             sql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorNumbersToAdd: null);
             sql.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
         });
+    }
+
+    /// <summary>
+    /// انبار امن فایل: بارگذاری، دانلود و حذف با اعتبارسنجی پسوند/اندازه و
+    /// جلوگیری از path traversal.
+    /// </summary>
+    public static IServiceCollection AddOdccFileStorage(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.SectionName));
+
+        services.AddSingleton<IFileStorage, FileSystemFileStorage>();
+        services.AddSingleton<IFileUploadService, FileUploadService>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// صف کارهای پس‌زمینه.
+    ///
+    /// طبق سیاست پروژه، پردازش پس‌زمینه یک اثر جانبی است و فقط با تأیید صریح
+    /// (<c>BackgroundJobs:EnableProcessor</c>) فعال می‌شود. صف همیشه قابل
+    /// استفاده است (کارها داخل آن قرار می‌گیرند) ولی اجرای آن‌ها وابسته به
+    /// این پرچم است.
+    /// </summary>
+    public static IServiceCollection AddOdccBackgroundJobs(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<BackgroundJobQueueOptions>(configuration.GetSection(BackgroundJobQueueOptions.SectionName));
+
+        services.AddSingleton<IBackgroundJobRunner, BackgroundJobRunner>();
+
+        var enableProcessor = configuration.GetValue<bool?>($"{BackgroundJobQueueOptions.SectionName}:EnableProcessor") is true;
+
+        if (enableProcessor)
+        {
+            services.AddHostedService<BackgroundJobRunnerHostedService>();
+        }
+
+        return services;
     }
 }

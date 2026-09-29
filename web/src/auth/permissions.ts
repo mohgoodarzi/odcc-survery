@@ -53,6 +53,20 @@ export const Permissions = {
   Actions: {
     View: 'actions.view',
     Manage: 'actions.manage'
+  },
+  Workflows: {
+    View: 'workflows.view',
+    Manage: 'workflows.manage',
+    Approve: 'workflows.approve'
+  },
+  Integrations: {
+    View: 'integrations.view',
+    Manage: 'integrations.manage',
+    Retry: 'integrations.retry'
+  },
+  System: {
+    View: 'system.view',
+    Manage: 'system.manage'
   }
 } as const;
 

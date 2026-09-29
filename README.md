@@ -6,7 +6,8 @@ Entity Framework Core، React 19 + TypeScript + Vite.
 
 مستندات: [`docs/architecture.md`](docs/architecture.md) ·
 [`docs/modules.md`](docs/modules.md) ·
-[`docs/localization.md`](docs/localization.md)
+[`docs/localization.md`](docs/localization.md) ·
+[`docs/deployment.md`](docs/deployment.md)
 
 ## پیش‌نیازها
 
@@ -79,6 +80,15 @@ dotnet ef migrations add InitialCreate -p src/ODCC.Infrastructure -s src/ODCC.Ap
 # ماژول مدیریت اقدامات (برنامه‌ها، آیتم‌ها، دیدگاه‌ها، پیوست‌ها)
 dotnet ef migrations add InitialCreate -p src/ODCC.Infrastructure -s src/ODCC.Api -c ActionManagementDbContext -o Modules/ActionManagement/Persistence/Migrations
 
+# ماژول گردش کار (تعاریف، نمونه‌ها، درخواست‌های تأیید)
+dotnet ef migrations add InitialCreate -p src/ODCC.Infrastructure -s src/ODCC.Api -c WorkflowDbContext -o Modules/Workflow/Persistence/Migrations
+
+# ماژول یکپارچه‌سازی (اندپوینت‌ها، تحویل وب‌هوک)
+dotnet ef migrations add InitialCreate -p src/ODCC.Infrastructure -s src/ODCC.Api -c IntegrationDbContext -o Modules/Integration/Persistence/Migrations
+
+# ماژول پیکربندی سامانه (تنظیمات، پرچم‌های ویژگی، سیاست‌ها)
+dotnet ef migrations add InitialCreate -p src/ODCC.Infrastructure -s src/ODCC.Api -c SystemConfigurationDbContext -o Modules/SystemConfiguration/Persistence/Migrations
+
 # اعمال همه‌ی مهاجرت‌ها (پس از تأیید)
 dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c AuditDbContext
 dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c IdentityDbContext
@@ -91,6 +101,9 @@ dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c Response
 dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c AnalyticsDbContext
 dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c NotificationDbContext
 dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c ActionManagementDbContext
+dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c WorkflowDbContext
+dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c IntegrationDbContext
+dotnet ef database update -p src/ODCC.Infrastructure -s src/ODCC.Api -c SystemConfigurationDbContext
 ```
 
 > **هیچ‌کدام از این دستورات را تا دریافت تأیید اجرا نکنید.**
@@ -161,27 +174,32 @@ dotnet publish src/ODCC.Api -c Release -o ./publish
 | حملات | HTTPS redirection + HSTS در تولید. |
 | هدرها | `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `COOP`, CSP. |
 | خطاها | `IExceptionHandler` سراسری؛ ردپای پشته هرگز سرور را ترک نمی‌کند. |
+| وب‌هوک ورودی | احراز هویت با **امضای HMAC-SHA256** (نه JWT) + محافظت در برابر بازپخش با برچسب زمانی؛ سقف بدنه ۱ مگابایت. |
+| اسرار یکپارچه‌سازی | فقط نام منطقی راز در پایگاه داده؛ مقدار واقعی از پیکربندی/متغیر محیطی. |
+| تنظیمات حساس | مقدار واقعی هرگز از API خارج نمی‌شود. |
 
 ## وضعیت پروژه
 
 **فاز ۰** (زیرساخت و مبنا)، **فاز ۱** (هویت، مجوزدهی و سازمان)، **فاز ۲**
 (کتابخانه‌ی سؤالات و پرسشنامه)، **فاز ۳** (نظرسنجی و کمپین)، **فاز ۴**
 (مدیریت پاسخ)، **فاز ۵** (تحلیلات و داشبورد)، **فاز ۶** (گزارش‌گیری)،
-**فاز ۷** (اعلان‌ها) و **فاز ۸** (مدیریت اقدام و پیگیری) پیاده‌سازی شده‌اند.
-ماژول‌های پیاده‌سازی‌شده تاکنون: Audit (ماژول مرجع)، Identity (کاربران، نقش‌ها،
-JWT، توکن‌های تازه‌سازی)، Organization (واحدهای سازمانی، موقعیت‌ها، کارمندان)،
-QuestionBank (سؤالات قابل‌استفاده‌ی مجدد، نسخه‌گذاری)، Questionnaire (بخش‌ها،
-آیتم‌ها، انشعاب)، Survey (چرخه‌ی عمر نظرسنجی، قالب‌ها، پرچم ناشناس)، Campaign
-(زمان‌بندی، جمعیت هدف، توزیع، یادآوری)، Response (ثبت پاسخ، ذخیره‌ی جزئی،
-ارسال، پاسخ‌های ناشناس)، Analytics (شاخص‌های NPS/CSAT/CES، مدل خواندنی،
-داشبورد، روند زمانی، بخش‌بندی سازمانی، بنچمارک‌ها)، Reporting (تعاریف گزارش،
-خروجی PDF/Excel، گزارش‌های زمان‌بندی‌شده، نگه‌داری پنجره‌ی خروجی) و
-Notification (تحویل درون‌برنامه‌ای/ایمیل/پیامک، قالب‌های قابل‌ویرایش، ترجیحات
-انصراف کاربر، امتحان مجدد نمایی) و ActionManagement (برنامه‌های اقدام از
-نتایج، مالکان و مسئولان، مهلت‌ها، یادآور و تشدید خودکار، دیدگاه‌ها و پیوست‌ها،
-سنجش اثربخشی با مقایسه‌ی شاخص قبل/بعد). سایر
-ماژول‌ها در فازهای بعدی ساخته می‌شوند. به جدول فازها در پروژه‌ی معماری مراجعه
-کنید.
+**فاز ۷** (اعلان‌ها)، **فاز ۸** (مدیریت اقدام و پیگیری) و **فاز ۹** (گردش کار،
+یکپارچه‌سازی و پیکربندی سامانه) پیاده‌سازی شده‌اند. هر ۱۵ ماژول کامل شده‌اند:
+Audit (ماژول مرجع)، Identity (کاربران، نقش‌ها، JWT، توکن‌های تازه‌سازی)،
+Organization (واحدهای سازمانی، موقعیت‌ها، کارمندان)، QuestionBank (سؤالات
+قابل‌استفاده‌ی مجدد، نسخه‌گذاری)، Questionnaire (بخش‌ها، آیتم‌ها، انشعاب)،
+Survey (چرخه‌ی عمر نظرسنجی، قالب‌ها، پرچم ناشناس)، Campaign (زمان‌بندی، جمعیت
+هدف، توزیع، یادآوری)، Response (ثبت پاسخ، ذخیره‌ی جزئی، ارسال، پاسخ‌های
+ناشناس)، Analytics (شاخص‌های NPS/CSAT/CES، مدل خواندنی، داشبورد، روند زمانی،
+بخش‌بندی سازمانی، بنچمارک‌ها)، Reporting (تعاریف گزارش، خروجی PDF/Excel،
+گزارش‌های زمان‌بندی‌شده، نگه‌داری پنجره‌ی خروجی) و Notification (تحویل
+درون‌برنامه‌ای/ایمیل/پیامک، قالب‌های قابل‌ویرایش، ترجیحات انصراف کاربر، امتحان
+مجدد نمایی) و ActionManagement (برنامه‌های اقدام از نتایج، مالکان و مسئولان،
+مهلت‌ها، یادآور و تشدید خودکار، دیدگاه‌ها و پیوست‌ها، سنجش اثربخشی با مقایسه‌ی
+شاخص قبل/بعد) و Workflow (ماشین وضعیت قابل پیکربندی چرخه‌ی عمر، درخواست تأیید
+با انقضای خودکار) و Integration (وب‌هوک خروجی/ورودی با امضای HMAC، همگون‌سازی
+HR، SSO، ارائه‌دهنده‌ی هوش مصنوعی) و SystemConfiguration (تنظیمات حساس، پرچم‌های
+ویژگی، سیاست‌های سیستمی).
 
 ## عیب‌یابی
 

@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
+using Microsoft.AspNetCore.RateLimiting;
 using ODCC.Api.Authorization;
 using ODCC.Application.Abstractions;
 using ODCC.Application.Authorization;
@@ -25,6 +27,8 @@ public sealed class AnalyticsController(IAnalyticsService analyticsService) : Co
     /// <summary>داشبورد تحلیلات سطح شرکت (با در نظر گرفتن دامنه‌ی سازمانی کاربر).</summary>
     [HttpGet("dashboard")]
     [HasPermission(Permissions.Analytics.View)]
+    [EnableRateLimiting("Critical")]
+    [OutputCache(PolicyName = "Dashboard")]
     [ProducesResponseType(typeof(AnalyticsDashboardDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<AnalyticsDashboardDto>> Dashboard(
         [FromQuery] AnalyticsFilter filter,

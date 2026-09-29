@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using ODCC.Application.Abstractions;
@@ -20,6 +21,10 @@ using ODCC.Application.Modules.Analytics.Abstractions;
 using ODCC.Application.Modules.Reporting.Abstractions;
 using ODCC.Application.Modules.Notification.Abstractions;
 using ODCC.Application.Modules.ActionManagement.Abstractions;
+using ODCC.Application.Modules.Workflow.Abstractions;
+using ODCC.Application.Modules.Integration.Abstractions;
+using ODCC.Application.Modules.SystemConfiguration.Abstractions;
+using ODCC.Application.Modules.FileStorage.Abstractions;
 using ODCC.Infrastructure.Modules.Audit.EventListeners;
 using ODCC.Infrastructure.Repositories.Audit;
 using ODCC.Infrastructure.Modules.Identity;
@@ -63,6 +68,20 @@ using ODCC.Infrastructure.Modules.ActionManagement.EventListeners;
 using ODCC.Infrastructure.Modules.ActionManagement.Persistence;
 using ODCC.Infrastructure.Modules.ActionManagement.Repositories;
 using ODCC.Infrastructure.Modules.ActionManagement.Services;
+using ODCC.Infrastructure.Modules.Workflow.EventListeners;
+using ODCC.Infrastructure.Modules.Workflow.Persistence;
+using ODCC.Infrastructure.Modules.Workflow.Repositories;
+using ODCC.Infrastructure.Modules.Workflow.Services;
+using ODCC.Infrastructure.Modules.Integration.EventListeners;
+using ODCC.Infrastructure.Modules.Integration.Persistence;
+using ODCC.Infrastructure.Modules.Integration.Repositories;
+using ODCC.Infrastructure.Modules.Integration.Services;
+using ODCC.Infrastructure.Modules.Integration.Scheduled;
+using ODCC.Infrastructure.Modules.SystemConfiguration.EventListeners;
+using ODCC.Infrastructure.Modules.SystemConfiguration.Persistence;
+using ODCC.Infrastructure.Modules.SystemConfiguration.Repositories;
+using ODCC.Infrastructure.Modules.SystemConfiguration.Services;
+using ODCC.Infrastructure.Modules.FileStorage.Services;
 using ODCC.Infrastructure.Modules.Organization.Persistence;
 using ODCC.Infrastructure.Modules.Organization.Repositories;
 using ODCC.Infrastructure.Modules.Organization.Services;
@@ -95,6 +114,9 @@ public sealed class TestEnvironment : IAsyncDisposable
     public ReportingDbContext ReportingDbContext { get; }
     public NotificationDbContext NotificationDbContext { get; }
     public ActionManagementDbContext ActionManagementDbContext { get; }
+    public WorkflowDbContext WorkflowDbContext { get; }
+    public IntegrationDbContext IntegrationDbContext { get; }
+    public SystemConfigurationDbContext SystemConfigurationDbContext { get; }
 
     private readonly SqliteConnection _identityConnection;
     private readonly SqliteConnection _organizationConnection;
@@ -108,6 +130,9 @@ public sealed class TestEnvironment : IAsyncDisposable
     private readonly SqliteConnection _reportingConnection;
     private readonly SqliteConnection _notificationConnection;
     private readonly SqliteConnection _actionManagementConnection;
+    private readonly SqliteConnection _workflowConnection;
+    private readonly SqliteConnection _integrationConnection;
+    private readonly SqliteConnection _systemConfigurationConnection;
     private readonly string _evidenceRoot;
 
     private TestEnvironment(
@@ -123,6 +148,9 @@ public sealed class TestEnvironment : IAsyncDisposable
         ReportingDbContext reportingDbContext,
         NotificationDbContext notificationDbContext,
         ActionManagementDbContext actionManagementDbContext,
+        WorkflowDbContext workflowDbContext,
+        IntegrationDbContext integrationDbContext,
+        SystemConfigurationDbContext systemConfigurationDbContext,
         SqliteConnection identityConnection,
         SqliteConnection organizationConnection,
         SqliteConnection auditConnection,
@@ -135,6 +163,9 @@ public sealed class TestEnvironment : IAsyncDisposable
         SqliteConnection reportingConnection,
         SqliteConnection notificationConnection,
         SqliteConnection actionManagementConnection,
+        SqliteConnection workflowConnection,
+        SqliteConnection integrationConnection,
+        SqliteConnection systemConfigurationConnection,
         string evidenceRoot)
     {
         Services = services;
@@ -149,6 +180,9 @@ public sealed class TestEnvironment : IAsyncDisposable
         ReportingDbContext = reportingDbContext;
         NotificationDbContext = notificationDbContext;
         ActionManagementDbContext = actionManagementDbContext;
+        WorkflowDbContext = workflowDbContext;
+        IntegrationDbContext = integrationDbContext;
+        SystemConfigurationDbContext = systemConfigurationDbContext;
         _identityConnection = identityConnection;
         _organizationConnection = organizationConnection;
         _auditConnection = auditConnection;
@@ -161,6 +195,9 @@ public sealed class TestEnvironment : IAsyncDisposable
         _reportingConnection = reportingConnection;
         _notificationConnection = notificationConnection;
         _actionManagementConnection = actionManagementConnection;
+        _workflowConnection = workflowConnection;
+        _integrationConnection = integrationConnection;
+        _systemConfigurationConnection = systemConfigurationConnection;
         _evidenceRoot = evidenceRoot;
     }
 
@@ -170,41 +207,50 @@ public sealed class TestEnvironment : IAsyncDisposable
     /// <param name="jwtSecret">کلید امضای توکن (پیش‌فرض: کلید آزمون).</param>
     public static async Task<TestEnvironment> CreateAsync(string? jwtSecret = null)
     {
-        var identityConnection = new SqliteConnection("DataSource=:memory:");
+        var identityConnection = new SqliteConnection($"DataSource=:memory:");
         await identityConnection.OpenAsync();
 
-        var organizationConnection = new SqliteConnection("DataSource=:memory:");
+        var organizationConnection = new SqliteConnection($"DataSource=:memory:");
         await organizationConnection.OpenAsync();
 
-        var auditConnection = new SqliteConnection("DataSource=:memory:");
+        var auditConnection = new SqliteConnection($"DataSource=:memory:");
         await auditConnection.OpenAsync();
 
-        var questionBankConnection = new SqliteConnection("DataSource=:memory:");
+        var questionBankConnection = new SqliteConnection($"DataSource=:memory:");
         await questionBankConnection.OpenAsync();
 
-        var questionnaireConnection = new SqliteConnection("DataSource=:memory:");
+        var questionnaireConnection = new SqliteConnection($"DataSource=:memory:");
         await questionnaireConnection.OpenAsync();
 
-        var surveyConnection = new SqliteConnection("DataSource=:memory:");
+        var surveyConnection = new SqliteConnection($"DataSource=:memory:");
         await surveyConnection.OpenAsync();
 
-        var campaignConnection = new SqliteConnection("DataSource=:memory:");
+        var campaignConnection = new SqliteConnection($"DataSource=:memory:");
         await campaignConnection.OpenAsync();
 
-        var responseConnection = new SqliteConnection("DataSource=:memory:");
+        var responseConnection = new SqliteConnection($"DataSource=:memory:");
         await responseConnection.OpenAsync();
 
-        var analyticsConnection = new SqliteConnection("DataSource=:memory:");
+        var analyticsConnection = new SqliteConnection($"DataSource=:memory:");
         await analyticsConnection.OpenAsync();
 
-        var reportingConnection = new SqliteConnection("DataSource=:memory:");
+        var reportingConnection = new SqliteConnection($"DataSource=:memory:");
         await reportingConnection.OpenAsync();
 
-        var notificationConnection = new SqliteConnection("DataSource=:memory:");
+        var notificationConnection = new SqliteConnection($"DataSource=:memory:");
         await notificationConnection.OpenAsync();
 
-        var actionManagementConnection = new SqliteConnection("DataSource=:memory:");
+        var actionManagementConnection = new SqliteConnection($"DataSource=:memory:");
         await actionManagementConnection.OpenAsync();
+
+        var workflowConnection = new SqliteConnection($"DataSource=:memory:");
+        await workflowConnection.OpenAsync();
+
+        var integrationConnection = new SqliteConnection($"DataSource=:memory:");
+        await integrationConnection.OpenAsync();
+
+        var systemConfigurationConnection = new SqliteConnection($"DataSource=:memory:");
+        await systemConfigurationConnection.OpenAsync();
 
         var services = new ServiceCollection();
 
@@ -254,6 +300,15 @@ public sealed class TestEnvironment : IAsyncDisposable
 
         services.AddDbContext<ActionManagementDbContext>(options =>
             options.UseSqlite(actionManagementConnection));
+
+        services.AddDbContext<WorkflowDbContext>(options =>
+            options.UseSqlite(workflowConnection));
+
+        services.AddDbContext<IntegrationDbContext>(options =>
+            options.UseSqlite(integrationConnection));
+
+        services.AddDbContext<SystemConfigurationDbContext>(options =>
+            options.UseSqlite(systemConfigurationConnection));
 
         services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
             {
@@ -355,6 +410,41 @@ public sealed class TestEnvironment : IAsyncDisposable
         services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.ActionManagement.Events.ActionCommentAddedEvent>, ActionManagementAuditEventListener>();
         services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.ActionManagement.Events.ActionEvidenceUploadedEvent>, ActionManagementAuditEventListener>();
 
+        // شنونده‌ی ممیزی برای رویدادهای گردش کار.
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Workflow.Events.WorkflowCreatedEvent>, WorkflowAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Workflow.Events.WorkflowUpdatedEvent>, WorkflowAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Workflow.Events.WorkflowActivatedEvent>, WorkflowAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Workflow.Events.WorkflowArchivedEvent>, WorkflowAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Workflow.Events.WorkflowInstanceStartedEvent>, WorkflowAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Workflow.Events.WorkflowInstanceTransitionedEvent>, WorkflowAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Workflow.Events.WorkflowInstanceCompletedEvent>, WorkflowAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Workflow.Events.WorkflowInstanceCancelledEvent>, WorkflowAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Workflow.Events.WorkflowApprovalRequestedEvent>, WorkflowAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Workflow.Events.WorkflowApprovalDecidedEvent>, WorkflowAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Workflow.Events.WorkflowApprovalExpiredEvent>, WorkflowAuditEventListener>();
+
+        // شنونده‌ی اعلان‌ها: درخواست تأیید گردش کار.
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Workflow.Events.WorkflowApprovalRequestedEvent>, WorkflowNotificationEventListener>();
+
+        // شنونده‌ی یکپارچه‌سازی: رویدادها را به وب‌هوک‌های خروجی تحویل می‌دهد.
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Analytics.Events.AnalyticsComputedEvent>, IntegrationWebhookEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Response.Events.ResponseSubmittedEvent>, IntegrationWebhookEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Workflow.Events.WorkflowInstanceTransitionedEvent>, IntegrationWebhookEventListener>();
+
+        // شنونده‌ی ممیزی برای رویدادهای یکپارچه‌سازی.
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Integration.Events.IntegrationEndpointCreatedEvent>, IntegrationAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Integration.Events.IntegrationEndpointUpdatedEvent>, IntegrationAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Integration.Events.IntegrationEndpointActivatedEvent>, IntegrationAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Integration.Events.IntegrationEndpointArchivedEvent>, IntegrationAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Integration.Events.WebhookDeliveredEvent>, IntegrationAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Integration.Events.WebhookDeliveryFailedEvent>, IntegrationAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.Integration.Events.InboundWebhookReceivedEvent>, IntegrationAuditEventListener>();
+
+        // شنونده‌ی ممیزی برای رویدادهای پیکربندی سامانه.
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.SystemConfiguration.Events.SettingChangedEvent>, SystemConfigurationAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.SystemConfiguration.Events.FeatureFlagChangedEvent>, SystemConfigurationAuditEventListener>();
+        services.AddScoped<IDomainEventListener<ODCC.Domain.Modules.SystemConfiguration.Events.SystemPolicyChangedEvent>, SystemConfigurationAuditEventListener>();
+
         services.AddScoped<IAuditEntryRepository, AuditEntryRepository>();
         services.AddScoped<IAuditService, AuditService>();
         services.AddScoped<IRefreshTokenStore, RefreshTokenStore>();
@@ -370,6 +460,45 @@ public sealed class TestEnvironment : IAsyncDisposable
         services.AddScoped<IReportingUnitOfWork, ReportingUnitOfWork>();
         services.AddScoped<INotificationUnitOfWork, NotificationUnitOfWork>();
         services.AddScoped<IActionManagementUnitOfWork, ActionManagementUnitOfWork>();
+
+        // ماژول گردش کار: مخازن، سرویس و مرز تراکنشی.
+        services.AddScoped<IWorkflowRepository, WorkflowRepository>();
+        services.AddScoped<IWorkflowInstanceRepository, WorkflowInstanceRepository>();
+        services.AddScoped<IWorkflowApprovalRepository, WorkflowApprovalRepository>();
+        services.AddScoped<IWorkflowService, WorkflowService>();
+        services.AddScoped<IWorkflowUnitOfWork, WorkflowUnitOfWork>();
+
+        // ماژول یکپارچه‌سازی: مخازن، سرویس، ارسال وب‌هوک و امضا.
+        services.AddScoped<IIntegrationEndpointRepository, IntegrationEndpointRepository>();
+        services.AddScoped<IWebhookDeliveryRepository, WebhookDeliveryRepository>();
+        services.AddScoped<IIntegrationService, IntegrationService>();
+        services.AddScoped<IWebhookDispatcher, WebhookDispatcher>();
+        services.AddScoped<IIntegrationUnitOfWork, IntegrationUnitOfWork>();
+        services.AddSingleton<IWebhookSigner, HmacWebhookSigner>();
+        services.AddSingleton<ISecretResolver, ConfigurationSecretResolver>();
+        services.AddHttpClient();
+        // ConfigurationSecretResolver به IConfiguration وابسته است که در محیط
+        // واقعی همیشه موجود است. یک پیکربندی خالی کافی است — رازها در آزمون
+        // استفاده نمی‌شوند و resolving نباید شکست بخورد.
+        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
+        services.AddSingleton(Options.Create(new IntegrationOptions()));
+        services.AddSingleton(Options.Create(new WebhookDeliveryOptions()));
+
+        // ماژول پیکربندی سامانه: مخازن، سرویس و کش.
+        services.AddScoped<ISettingRepository, SettingRepository>();
+        services.AddScoped<IFeatureFlagRepository, FeatureFlagRepository>();
+        services.AddScoped<ISystemPolicyRepository, SystemPolicyRepository>();
+        services.AddScoped<ISystemConfigurationService, SystemConfigurationService>();
+        services.AddScoped<ISystemConfigurationUnitOfWork, SystemConfigurationUnitOfWork>();
+        services.AddScoped<IFeatureFlagService, CachedFeatureFlagService>();
+        services.AddScoped<ISettingService, CachedSettingService>();
+        services.AddMemoryCache();
+        services.AddSingleton(Options.Create(new SystemConfigurationOptions()));
+
+        // انبار فایل مشترک (شاخه‌ی موقت، در پایان آزمون پاک می‌شود).
+        services.AddSingleton(Options.Create(new FileStorageOptions { RootPath = evidenceRoot, MaxFileSizeMb = 25 }));
+        services.AddSingleton<IFileStorage, FileSystemFileStorage>();
+        services.AddSingleton<IFileUploadService, FileUploadService>();
 
         services.AddScoped<IOrgUnitRepository, OrgUnitRepository>();
         services.AddScoped<IPositionRepository, PositionRepository>();
@@ -469,6 +598,9 @@ public sealed class TestEnvironment : IAsyncDisposable
         var reportingDbContext = provider.GetRequiredService<ReportingDbContext>();
         var notificationDbContext = provider.GetRequiredService<NotificationDbContext>();
         var actionManagementDbContext = provider.GetRequiredService<ActionManagementDbContext>();
+        var workflowDbContext = provider.GetRequiredService<WorkflowDbContext>();
+        var integrationDbContext = provider.GetRequiredService<IntegrationDbContext>();
+        var systemConfigurationDbContext = provider.GetRequiredService<SystemConfigurationDbContext>();
 
         await identityDbContext.Database.EnsureCreatedAsync();
         await organizationDbContext.Database.EnsureCreatedAsync();
@@ -482,15 +614,20 @@ public sealed class TestEnvironment : IAsyncDisposable
         await reportingDbContext.Database.EnsureCreatedAsync();
         await notificationDbContext.Database.EnsureCreatedAsync();
         await actionManagementDbContext.Database.EnsureCreatedAsync();
+        await workflowDbContext.Database.EnsureCreatedAsync();
+        await integrationDbContext.Database.EnsureCreatedAsync();
+        await systemConfigurationDbContext.Database.EnsureCreatedAsync();
 
         return new TestEnvironment(provider, identityDbContext, organizationDbContext,
             questionBankDbContext, questionnaireDbContext, surveyDbContext, campaignDbContext,
             responseDbContext, analyticsDbContext, reportingDbContext, notificationDbContext,
             actionManagementDbContext,
+            workflowDbContext, integrationDbContext, systemConfigurationDbContext,
             identityConnection, organizationConnection, auditConnection,
             questionBankConnection, questionnaireConnection, surveyConnection, campaignConnection,
             responseConnection, analyticsConnection, reportingConnection, notificationConnection,
-            actionManagementConnection, evidenceRoot);
+            actionManagementConnection, workflowConnection, integrationConnection,
+            systemConfigurationConnection, evidenceRoot);
     }
 
     /// <summary>
@@ -511,6 +648,31 @@ public sealed class TestEnvironment : IAsyncDisposable
         current.DataScope = dataScope;
         current.Permissions = permissions;
         return (current, userId);
+    }
+
+    /// <summary>
+    /// تامین یک راز یکپارچه‌سازی برای آزمون. رازها در پیکربندی (نه پایگاه داده)
+    /// نگه داشته می‌شوند؛ این متد مقدار را در گزینه‌های از پیش ثبت‌شده قرار
+    /// می‌دهد تا <see cref="ISecretResolver"/> بتواند آن را بخواند.
+    /// </summary>
+    public void SetIntegrationsSecret(string secretRef, string secretValue)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(secretRef);
+        ArgumentException.ThrowIfNullOrWhiteSpace(secretValue);
+
+        var options = Services.GetRequiredService<IOptions<IntegrationOptions>>().Value;
+        options.Secrets[secretRef] = secretValue;
+    }
+
+    /// <summary>
+    /// تغییر تنظیمات ماژول یکپارچه‌سازی برای آزمون (مثلاً تلارانس برچسب زمانی
+    /// وب‌هوک ورودی). گزینه‌ها از پیش به‌صورت singleton ثبت شده‌اند.
+    /// </summary>
+    public void SetIntegrationOptions(Action<IntegrationOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(configure);
+
+        configure(Services.GetRequiredService<IOptions<IntegrationOptions>>().Value);
     }
 
     /// <summary>ساخت ساختار سازمانی نمونه: شرکت → دایرکتی → دپارتمان → تیم.</summary>
@@ -598,6 +760,9 @@ public sealed class TestEnvironment : IAsyncDisposable
         await ReportingDbContext.DisposeAsync();
         await NotificationDbContext.DisposeAsync();
         await ActionManagementDbContext.DisposeAsync();
+        await WorkflowDbContext.DisposeAsync();
+        await IntegrationDbContext.DisposeAsync();
+        await SystemConfigurationDbContext.DisposeAsync();
         await _identityConnection.DisposeAsync();
         await _organizationConnection.DisposeAsync();
         await _auditConnection.DisposeAsync();
@@ -610,6 +775,9 @@ public sealed class TestEnvironment : IAsyncDisposable
         await _reportingConnection.DisposeAsync();
         await _notificationConnection.DisposeAsync();
         await _actionManagementConnection.DisposeAsync();
+        await _workflowConnection.DisposeAsync();
+        await _integrationConnection.DisposeAsync();
+        await _systemConfigurationConnection.DisposeAsync();
 
         // پاک کردن شاخه‌ی موقت پیوست‌های اقدامات.
         try

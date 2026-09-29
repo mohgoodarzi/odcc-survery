@@ -3,7 +3,8 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, FileText, Megaphone, BarChart3, FileBarChart, Settings, Languages,
   Users, ShieldCheck, Building2, Briefcase, UserCircle, LogOut, ChevronDown,
-  LayoutTemplate, ClipboardCheck, MessageSquareText, ClipboardList
+  LayoutTemplate, ClipboardCheck, MessageSquareText, ClipboardList, Workflow,
+  GitBranch, CheckCircle, Plug, Send, SlidersHorizontal, Flag, ScrollText
 } from 'lucide-react';
 
 import { useAuth } from '@/auth/AuthProvider';
@@ -80,6 +81,54 @@ export function AppLayout({ children }: { children: ReactNode }) {
       permissions: [Permissions.Actions.View]
     },
     {
+      to: `/${culture}/workflows`,
+      label: t.nav.workflows,
+      icon: Workflow,
+      permissions: [Permissions.Workflows.View]
+    },
+    {
+      to: `/${culture}/workflow-instances`,
+      label: t.nav.instances,
+      icon: GitBranch,
+      permissions: [Permissions.Workflows.View]
+    },
+    {
+      to: `/${culture}/approvals`,
+      label: t.nav.approvals,
+      icon: CheckCircle,
+      permissions: [Permissions.Workflows.Approve]
+    },
+    {
+      to: `/${culture}/integrations/endpoints`,
+      label: t.nav.integrations,
+      icon: Plug,
+      permissions: [Permissions.Integrations.View]
+    },
+    {
+      to: `/${culture}/integrations/deliveries`,
+      label: t.nav.deliveries,
+      icon: Send,
+      permissions: [Permissions.Integrations.View]
+    },
+    {
+      to: `/${culture}/system/settings`,
+      label: t.nav.systemSettings,
+      icon: SlidersHorizontal,
+      permissions: [Permissions.System.View]
+    },
+    {
+      to: `/${culture}/system/feature-flags`,
+      label: t.nav.featureFlags,
+      icon: Flag,
+      permissions: [Permissions.System.View]
+    },
+    {
+      to: `/${culture}/system/policies`,
+      label: t.nav.systemPolicies,
+      icon: ScrollText,
+      permissions: [Permissions.System.View]
+    },
+    {
       to: `/${culture}/organization/units`,
       label: t.nav.orgUnits,
       icon: Building2,
@@ -111,7 +160,6 @@ export function AppLayout({ children }: { children: ReactNode }) {
     },
     { to: `/${culture}/settings`, label: t.nav.settings, icon: Settings }
   ];
-
   const visibleNavItems = navItems.filter(
     (item) => !item.permissions || hasAnyPermission(...item.permissions)
   );

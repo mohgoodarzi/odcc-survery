@@ -1,8 +1,10 @@
 using System.Globalization;
 using System.Text;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Localization.Routing;
 using Microsoft.AspNetCore.OpenApi;
@@ -11,7 +13,9 @@ using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
+using ODCC.Api;
 using ODCC.Api.Authorization;
 using ODCC.Api.Filters;
 using ODCC.Api.Middleware;
@@ -32,6 +36,9 @@ using ODCC.Infrastructure.Modules.Analytics.Persistence;
 using ODCC.Infrastructure.Modules.Reporting.Persistence;
 using ODCC.Infrastructure.Modules.Notification.Persistence;
 using ODCC.Infrastructure.Modules.ActionManagement.Persistence;
+using ODCC.Infrastructure.Modules.Workflow.Persistence;
+using ODCC.Infrastructure.Modules.Integration.Persistence;
+using ODCC.Infrastructure.Modules.SystemConfiguration.Persistence;
 using ODCC.Infrastructure.Persistence.Audit;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -47,6 +54,11 @@ builder.Services.AddOdccReporting(builder.Configuration);
 builder.Services.AddOdccNotifications(builder.Configuration);
 builder.Services.AddOdccCampaignReminders(builder.Configuration);
 builder.Services.AddOdccActions(builder.Configuration);
+builder.Services.AddOdccWorkflow(builder.Configuration);
+builder.Services.AddOdccIntegrations(builder.Configuration);
+builder.Services.AddOdccSystemConfiguration(builder.Configuration);
+builder.Services.AddOdccFileStorage(builder.Configuration);
+builder.Services.AddOdccBackgroundJobs(builder.Configuration);
 builder.Services.AddOdccDatabaseInitializer(builder.Configuration);
 
 // ---- احراز هویت و مجوزدهی -----------------------------------------------
@@ -139,7 +151,13 @@ builder.Services.AddAntiforgery(options =>
     options.Cookie.SameSite = SameSiteMode.Lax;
 });
 
-// محدودیت نرخ سراسری برای جلوگیری از سوءاستفاده.
+// محدودیت نرخ: خط‌مشی‌های متفاوت برای انواع مسیر.
+// - Default: خط‌مشی سراسری (GlobalLimiter) — هر درخواستی زیر این سقف است.
+// - Public: مسیرهای عمومی (لاگین، وب‌هوک ورودی) — محدودتر برای جلوگیری از
+//   brute-force و اسپم.
+// - Critical: عملیات پرهزینه (داشبورد، گزارش، تحلیل) — جلوگیری از فشار زیاد.
+// وقتی هم خط‌مشی سراسری و هم خط‌مشی نقطه‌ای اعمال شوند، هر دو سقف فعال
+// می‌شوند (دفاع در عمق).
 builder.Services.AddRateLimiter(options =>
 {
     options.AddFixedWindowLimiter("Default", window =>
@@ -147,7 +165,46 @@ builder.Services.AddRateLimiter(options =>
         window.Window = TimeSpan.FromMinutes(1);
         window.PermitLimit = 60;
     });
+    options.AddFixedWindowLimiter("Public", window =>
+    {
+        window.Window = TimeSpan.FromMinutes(1);
+        window.PermitLimit = 20;
+    });
+    options.AddFixedWindowLimiter("Critical", window =>
+    {
+        window.Window = TimeSpan.FromMinutes(1);
+        window.PermitLimit = 30;
+    });
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // خط‌مشی سراسری: همه‌ی مسیرها (حتی بدون ویژگی) زیر سقف پایه قرار می‌گیرند.
+    // مسیرهای بررسی سلامت از این سقف معافند تا پروب‌های متوالیِ متعادل‌کننده‌ی
+    // بار مسدود نشوند.
+    options.GlobalLimiter = PartitionedRateLimiter.Create<Microsoft.AspNetCore.Http.HttpContext, string>(
+        httpContext => RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                Window = TimeSpan.FromMinutes(1),
+                PermitLimit = 60,
+                QueueLimit = 0
+            }));
+});
+
+// کش خروجی برای پاسخ‌های پرهزینه و تغییرناپذیر (داشبورد، آمار، متادیتا).
+// انقضای کوتاه: همه داده‌ی تازه را می‌بینند و فشار پایگاه داده کم می‌شود.
+// خط‌مشی‌ها بر اساس هدر Authorization تفکیک می‌شوند تا پاسخِ کاربری با مجوز،
+// برای کاربرِ بدون مجوز (یا برعکس) لو نرود (جلوگیری از آلودگی کش).
+builder.Services.AddOutputCache(options =>
+{
+    options.AddPolicy("Dashboard", policy => policy
+        .Expire(TimeSpan.FromSeconds(30))
+        .SetVaryByHeader("Authorization")
+        .Tag("dashboard"));
+
+    options.AddPolicy("Metadata", policy => policy
+        .Expire(TimeSpan.FromMinutes(5))
+        .Tag("metadata"));
 });
 
 builder.Services.AddProblemDetails();
@@ -161,19 +218,27 @@ builder.Services.AddHsts(options =>
 
 // بررسی سلامت: مسیر واقعی داده را اجرا می‌کند؛ «سالم» یعنی برنامه واقعاً
 // می‌تواند با SQL Server صحبت کند. هر DbContext ماژول یک بررسی جداگانه است.
+// - «self» (برچسب live): فقط در صورت اجرای خود برنامه سالم است → /health/live
+//   برای پروبِ زنده‌بودن (liveness) متعادل‌کننده‌ی بار/IIS.
+// - بررسی‌های پایگاه داده → /health/ready (آماده‌بودن) و /health.
+// این تفکیک باعث نمی‌شود برنامه به‌خاطر کندی موقت پایگاه داده ری‌استارت شود.
 builder.Services.AddHealthChecks()
-    .AddDbContextCheck<AuditDbContext>("sql-server-audit")
-    .AddDbContextCheck<IdentityDbContext>("sql-server-identity")
-    .AddDbContextCheck<OrganizationDbContext>("sql-server-organization")
-    .AddDbContextCheck<QuestionBankDbContext>("sql-server-question-bank")
-    .AddDbContextCheck<QuestionnaireDbContext>("sql-server-questionnaire")
-    .AddDbContextCheck<SurveyDbContext>("sql-server-survey")
-    .AddDbContextCheck<CampaignDbContext>("sql-server-campaign")
-    .AddDbContextCheck<ResponseDbContext>("sql-server-response")
-    .AddDbContextCheck<AnalyticsDbContext>("sql-server-analytics")
-    .AddDbContextCheck<ReportingDbContext>("sql-server-reporting")
-    .AddDbContextCheck<NotificationDbContext>("sql-server-notification")
-    .AddDbContextCheck<ActionManagementDbContext>("sql-server-action-management");
+    .AddCheck("self", () => HealthCheckResult.Healthy(), tags: HealthCheckTags.Live)
+    .AddDbContextCheck<AuditDbContext>("sql-server-audit", tags: HealthCheckTags.Ready)
+    .AddDbContextCheck<IdentityDbContext>("sql-server-identity", tags: HealthCheckTags.Ready)
+    .AddDbContextCheck<OrganizationDbContext>("sql-server-organization", tags: HealthCheckTags.Ready)
+    .AddDbContextCheck<QuestionBankDbContext>("sql-server-question-bank", tags: HealthCheckTags.Ready)
+    .AddDbContextCheck<QuestionnaireDbContext>("sql-server-questionnaire", tags: HealthCheckTags.Ready)
+    .AddDbContextCheck<SurveyDbContext>("sql-server-survey", tags: HealthCheckTags.Ready)
+    .AddDbContextCheck<CampaignDbContext>("sql-server-campaign", tags: HealthCheckTags.Ready)
+    .AddDbContextCheck<ResponseDbContext>("sql-server-response", tags: HealthCheckTags.Ready)
+    .AddDbContextCheck<AnalyticsDbContext>("sql-server-analytics", tags: HealthCheckTags.Ready)
+    .AddDbContextCheck<ReportingDbContext>("sql-server-reporting", tags: HealthCheckTags.Ready)
+    .AddDbContextCheck<NotificationDbContext>("sql-server-notification", tags: HealthCheckTags.Ready)
+    .AddDbContextCheck<ActionManagementDbContext>("sql-server-action-management", tags: HealthCheckTags.Ready)
+    .AddDbContextCheck<WorkflowDbContext>("sql-server-workflow", tags: HealthCheckTags.Ready)
+    .AddDbContextCheck<IntegrationDbContext>("sql-server-integration", tags: HealthCheckTags.Ready)
+    .AddDbContextCheck<SystemConfigurationDbContext>("sql-server-system-configuration", tags: HealthCheckTags.Ready);
 
 var app = builder.Build();
 
@@ -204,6 +269,9 @@ app.UseStaticFiles(new StaticFileOptions
 
 app.UseRouting();
 
+// کش خروجی: باید بعد از routing و قبل از authorization باشد.
+app.UseOutputCache();
+
 // بعد از routing عمداً: RouteDataRequestCultureProvider به مقدار مسیر {culture} نیاز دارد.
 app.UseRequestLocalization();
 
@@ -220,7 +288,20 @@ app.UseRateLimiter();
 app.UseAntiforgery();
 
 app.MapControllers();
-app.MapHealthChecks("/health");
+
+// نقاط پایانی بررسی سلامت. پروب زنده‌بودن (/health/live) فقط اجرای خود برنامه
+// را بررسی می‌کند و پروب آماده‌بودن (/health/ready) وابستگی‌های واقعی (پایگاه
+// داده) را. هر دو از محدودیت نرخ معافند تا پروب‌های مکرر متعادل‌کننده‌ی بار
+// یا IIS مسدود نشوند.
+app.MapHealthChecks("/health").DisableRateLimiting();
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("live")
+}).DisableRateLimiting();
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready")
+}).DisableRateLimiting();
 
 // بازگشت به SPA تا پیوندهای عمیق به index.html منجر به 404 نشوند.
 app.MapFallbackToFile("index.html");
