@@ -28,7 +28,17 @@ public interface IAnalyticsService
     /// این عملیات پس از هر ارسال پاسخ به‌صورت خودکار توسط شنونده‌ی رویداد
     /// فراخوانی می‌شود، ولی مدیران هم می‌توانند آن را دستی اجرا کنند.
     /// </summary>
-    Task<Result<SurveyAnalyticsDto>> ComputeAsync(ComputeAnalyticsRequest request, CancellationToken ct = default);
+    /// <param name="request">درخواست محاسبه (شناسه‌ی نظرسنجی، فیلتر و بخش‌بندی).</param>
+    /// <param name="actorUserId">
+    /// کاربری که محاسبه را راه‌اندازی کرده. در مسیر خودکار باید <c>null</c> داده
+    /// شود: کاربرِ درخواست در آن مسیر خودِ پاسخ‌گوست و شناسه‌ی او نباید به
+    /// ماژول‌های پایین‌دست (مثل برنامه‌ی اقدام خودکار) نشت کند.
+    /// </param>
+    /// <param name="ct">توکن لغو.</param>
+    Task<Result<SurveyAnalyticsDto>> ComputeAsync(
+        ComputeAnalyticsRequest request,
+        Guid? actorUserId = null,
+        CancellationToken ct = default);
 
     /// <summary>
     /// دریافت تحلیلات ذخیره‌شده‌ی یک نظرسنجی بدون محاسبه‌ی مجدد. اگر عکس‌العملی

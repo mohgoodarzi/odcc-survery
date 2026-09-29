@@ -39,6 +39,10 @@ public class ResponseDbContext(DbContextOptions<ResponseDbContext> options) : Db
             b.HasIndex(s => s.SurveyId);
             b.HasIndex(s => s.Status);
 
+            // جستجوی نشست بر اساس دعوت‌نامه (سیاست «پاسخ یگانه» در نظرسنجی‌های
+            // ناشناس، جایی که شناسه‌ی پاسخ‌گو ذخیره نمی‌شود).
+            b.HasIndex(s => s.DistributionId);
+
             // پاسخ‌ها به‌صورت آبشاری حذف می‌شوند (خانواده‌ی نشست).
             b.HasMany(s => s.Answers)
                 .WithOne()

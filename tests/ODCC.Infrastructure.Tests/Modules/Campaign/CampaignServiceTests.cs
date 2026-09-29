@@ -639,4 +639,235 @@ public class CampaignServiceTests
         updated.Value.Reminders.Should().ContainSingle();
         updated.Value.Reminders[0].Id.Should().Be(reminderId);
     }
+
+    // --- مرز سازمانی (fail-closed) --------------------------------------------
+
+    /// <summary>
+    /// ساختن کمپینی متعلق به زیردرخت /hq/ops/it، یعنی خارج از دامنه‌ی
+    /// /hq/fin/ap که در آزمون‌ها به کاربر محدود می‌شود. کاربر جاری در پایان
+    /// دامنه‌ی Company روی همان واحد است.
+    /// </summary>
+    /// <returns>(شناسه‌ی کمپین، شناسه‌ی واحد /hq/fin/ap، شناسه‌ی نظرسنجی)</returns>
+    private static async Task<(Guid campaignId, Guid visibleUnitId, Guid surveyId)> SeedCampaignOutsideScopeAsync(
+        TestEnvironment env, string code = "CMP-OUT")
+    {
+        // نظرسنجی با کاربر Company ساخته می‌شود (بدون کاربر، دامنه‌ای نیست).
+        env.SetCurrentUser(orgUnitId: null, DataScope.Company);
+        var survey = await SeedActiveSurveyAsync(env);
+        var ids = await env.SeedOrgHierarchyAsync();
+
+        // کمپین توسط کاربری با دامنه‌ی Department روی /hq/ops/it ساخته می‌شود
+        // تا مالکیت سازمانی آن زیردرخت باشد.
+        env.SetCurrentUser(ids.otherDepartmentId, DataScope.Department);
+        var service = env.Services.GetRequiredService<ICampaignService>();
+
+        var created = await service.CreateAsync(CreateRequest(code, survey.Id));
+        created.IsSuccess.Should().BeTrue();
+
+        var row = await env.CampaignDbContext.Campaigns.SingleAsync();
+        row.OrgUnitId.Should().Be(ids.otherDepartmentId);
+        row.OrgUnitPath.Should().Be("/hq/ops/it");
+
+        return (created.Value!.Id, ids.departmentId, survey.Id);
+    }
+
+    [Fact]
+    public async Task Department_Scope_GetById_Denies_Campaign_Outside_Scope()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        var (campaignId, visibleUnitId, _) = await SeedCampaignOutsideScopeAsync(env);
+        env.SetCurrentUser(visibleUnitId, DataScope.Department);
+
+        var service = env.Services.GetRequiredService<ICampaignService>();
+
+        var result = await service.GetByIdAsync(campaignId);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("campaign_not_found");
+    }
+
+    [Fact]
+    public async Task Department_Scope_Search_Excludes_Out_Of_Scope_Campaigns()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        var (_, visibleUnitId, _) = await SeedCampaignOutsideScopeAsync(env);
+        env.SetCurrentUser(visibleUnitId, DataScope.Department);
+
+        var service = env.Services.GetRequiredService<ICampaignService>();
+
+        var result = await service.SearchAsync(new CampaignSearchRequest());
+
+        result.TotalCount.Should().Be(0);
+        result.Items.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Department_Scope_GetDistributions_Empty_For_Outside_Scope()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        var (campaignId, visibleUnitId, _) = await SeedCampaignOutsideScopeAsync(env);
+        env.SetCurrentUser(visibleUnitId, DataScope.Department);
+
+        var service = env.Services.GetRequiredService<ICampaignService>();
+
+        var result = await service.GetDistributionsAsync(campaignId, new DistributionSearchRequest());
+
+        result.TotalCount.Should().Be(0);
+        result.Items.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Department_Scope_Update_Denies_Outside_Scope()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        var (campaignId, visibleUnitId, surveyId) = await SeedCampaignOutsideScopeAsync(env);
+        env.SetCurrentUser(visibleUnitId, DataScope.Department);
+
+        var service = env.Services.GetRequiredService<ICampaignService>();
+
+        var result = await service.UpdateAsync(campaignId, CreateRequest("CMP-OUT", surveyId));
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("campaign_not_found");
+    }
+
+    [Fact]
+    public async Task Department_Scope_Schedule_Denies_Outside_Scope()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        var (campaignId, visibleUnitId, _) = await SeedCampaignOutsideScopeAsync(env);
+        env.SetCurrentUser(visibleUnitId, DataScope.Department);
+
+        var service = env.Services.GetRequiredService<ICampaignService>();
+
+        var result = await service.ScheduleAsync(campaignId, DateTime.UtcNow.AddDays(3));
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("campaign_not_found");
+
+        var row = await env.CampaignDbContext.Campaigns.SingleAsync();
+        row.ScheduledAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Department_Scope_Launch_Denies_Outside_Scope()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        var (campaignId, visibleUnitId, _) = await SeedCampaignOutsideScopeAsync(env);
+        env.SetCurrentUser(visibleUnitId, DataScope.Department);
+
+        var service = env.Services.GetRequiredService<ICampaignService>();
+
+        var result = await service.LaunchAsync(campaignId);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("campaign_not_found");
+
+        // هیچ ردیف توزیعی نباید ساخته شده باشد.
+        (await env.CampaignDbContext.Distributions.AnyAsync()).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Department_Scope_Complete_Denies_Outside_Scope()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        var (campaignId, visibleUnitId, _) = await SeedCampaignOutsideScopeAsync(env);
+
+        // کمپین توسط کاربر Company اجرا می‌شود تا به حالت Running برسد.
+        var service = env.Services.GetRequiredService<ICampaignService>();
+        (await service.LaunchAsync(campaignId)).IsSuccess.Should().BeTrue();
+
+        env.SetCurrentUser(visibleUnitId, DataScope.Department);
+
+        var result = await service.CompleteAsync(campaignId);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("campaign_not_found");
+
+        var row = await env.CampaignDbContext.Campaigns.SingleAsync();
+        row.Status.Should().Be(CampaignStatus.Running);
+    }
+
+    [Fact]
+    public async Task Department_Scope_Archive_Denies_Outside_Scope()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        var (campaignId, visibleUnitId, _) = await SeedCampaignOutsideScopeAsync(env);
+        env.SetCurrentUser(visibleUnitId, DataScope.Department);
+
+        var service = env.Services.GetRequiredService<ICampaignService>();
+
+        var result = await service.ArchiveAsync(campaignId);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("campaign_not_found");
+
+        var row = await env.CampaignDbContext.Campaigns.SingleAsync();
+        row.Status.Should().Be(CampaignStatus.Draft);
+    }
+
+    [Fact]
+    public async Task Department_Scope_Delete_Denies_Outside_Scope()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        var (campaignId, visibleUnitId, _) = await SeedCampaignOutsideScopeAsync(env);
+        env.SetCurrentUser(visibleUnitId, DataScope.Department);
+
+        var service = env.Services.GetRequiredService<ICampaignService>();
+
+        var result = await service.DeleteAsync(campaignId);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("campaign_not_found");
+        (await env.CampaignDbContext.Campaigns.AnyAsync(c => !c.IsDeleted)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Department_Scope_CancelReminder_Denies_Outside_Scope()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        env.SetCurrentUser(orgUnitId: null, DataScope.Company);
+        var survey = await SeedActiveSurveyAsync(env);
+        var ids = await env.SeedOrgHierarchyAsync();
+
+        env.SetCurrentUser(ids.otherDepartmentId, DataScope.Company);
+        var service = env.Services.GetRequiredService<ICampaignService>();
+
+        var reminderId = Guid.CreateVersion7();
+        var created = await service.CreateAsync(CreateRequest(
+            "CMP-REM-OUT",
+            survey.Id,
+            reminders: [CreateReminder(DateTime.UtcNow.AddDays(1)) with { Id = reminderId }]));
+        created.IsSuccess.Should().BeTrue();
+
+        env.SetCurrentUser(ids.departmentId, DataScope.Department);
+
+        var result = await service.CancelReminderAsync(created.Value!.Id, reminderId);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("campaign_not_found");
+    }
+
+    [Fact]
+    public async Task Create_As_Department_Anchors_Campaign_To_Scope()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        env.SetCurrentUser(orgUnitId: null, DataScope.Company);
+        var survey = await SeedActiveSurveyAsync(env);
+        var ids = await env.SeedOrgHierarchyAsync();
+
+        env.SetCurrentUser(ids.departmentId, DataScope.Department);
+        var service = env.Services.GetRequiredService<ICampaignService>();
+
+        var created = await service.CreateAsync(CreateRequest("CMP-ANCHOR", survey.Id));
+
+        created.IsSuccess.Should().BeTrue();
+
+        var row = await env.CampaignDbContext.Campaigns.SingleAsync();
+        row.OrgUnitId.Should().Be(ids.departmentId);
+        row.OrgUnitPath.Should().Be("/hq/fin/ap");
+
+        // کمپین داخل دامنه برای همان کاربر قابل مشاهده است.
+        (await service.GetByIdAsync(created.Value!.Id)).IsSuccess.Should().BeTrue();
+    }
 }

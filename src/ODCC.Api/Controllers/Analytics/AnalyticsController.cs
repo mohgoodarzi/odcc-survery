@@ -20,9 +20,12 @@ namespace ODCC.Api.Controllers.Analytics;
 /// </summary>
 [ApiController]
 [Route("api/{culture:language}/analytics")]
-public sealed class AnalyticsController(IAnalyticsService analyticsService) : ControllerBase
+public sealed class AnalyticsController(
+    IAnalyticsService analyticsService,
+    ICurrentUserService currentUserService) : ControllerBase
 {
     private readonly IAnalyticsService _analyticsService = analyticsService;
+    private readonly ICurrentUserService _currentUserService = currentUserService;
 
     /// <summary>داشبورد تحلیلات سطح شرکت (با در نظر گرفتن دامنه‌ی سازمانی کاربر).</summary>
     [HttpGet("dashboard")]
@@ -85,7 +88,9 @@ public sealed class AnalyticsController(IAnalyticsService analyticsService) : Co
         var compute = request ?? new ComputeAnalyticsRequest { SurveyId = surveyId };
         compute = compute with { SurveyId = surveyId };
 
-        var result = await _analyticsService.ComputeAsync(compute, ct);
+        // این مسیر صریح توسط مدیر فراخوانی می‌شود، پس کاربر جاری مجاز به
+        // مشاهده‌ی تحلیلات است و شناسه‌ی او به‌عنوان عامل محاسبه ثبت می‌شود.
+        var result = await _analyticsService.ComputeAsync(compute, _currentUserService.UserId, ct);
 
         if (result.IsFailure)
         {

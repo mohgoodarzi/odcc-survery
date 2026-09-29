@@ -56,9 +56,12 @@ public sealed class WorkflowApprovalsController(IWorkflowService workflowService
         return Ok(result.Value);
     }
 
-    /// <summary>تأیید یک درخواست. کاربر باید مجوز مشخص‌شده روی گذار را داشته باشد.</summary>
+    /// <summary>
+    /// تأیید یک درخواست. مرز واقعی در سرویس است: کاربر باید مجوز مشخص‌شده روی
+    /// گذار (یا <c>workflows.approve</c> در نبود مجوز صریح) داشته باشد؛ در غیر
+    /// این صورت سرویس ۴۰۴ برمی‌گرداند تا وجود درخواست فاش نشود.
+    /// </summary>
     [HttpPost("{id:guid}/approve")]
-    [HasPermission(Permissions.Workflows.Approve)]
     [ProducesResponseType(typeof(WorkflowApprovalRequestDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
@@ -95,9 +98,11 @@ public sealed class WorkflowApprovalsController(IWorkflowService workflowService
         return Ok(result.Value);
     }
 
-    /// <summary>رد یک درخواست. کاربر باید مجوز مشخص‌شده روی گذار را داشته باشد.</summary>
+    /// <summary>
+    /// رد یک درخواست. همانند تأیید، مرز واقعی در سرویس است (مجوز گذار یا
+    /// <c>workflows.approve</c>) تا کاربرِ دارایِ مجوزِ گذار مسدود نشود.
+    /// </summary>
     [HttpPost("{id:guid}/reject")]
-    [HasPermission(Permissions.Workflows.Approve)]
     [ProducesResponseType(typeof(WorkflowApprovalRequestDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]

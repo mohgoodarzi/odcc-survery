@@ -36,14 +36,16 @@ public sealed partial class AnalyticsResponseEventListener(
         try
         {
             // محاسبه‌ی عکس‌العمل کلی نظرسنجی. شناسه‌ی پاسخ‌گو عمداً استفاده نمی‌شود
-            // تا تجمع بر اساس همه‌ی پاسخ‌ها انجام شود.
+            // تا تجمع بر اساس همه‌ی پاسخ‌ها انجام شود. actorUserId نیز null است:
+            // کاربرِ این درخواست خودِ پاسخ‌گوست و شناسه‌ی او نباید به ماژول‌های
+            // پایین‌دست (مثل برنامه‌ی اقدام خودکار) نشت کند.
             await _analyticsService.ComputeAsync(new ComputeAnalyticsRequest
             {
                 SurveyId = domainEvent.SurveyId,
                 Filter = new AnalyticsFilter(),
                 SegmentType = AnalyticsSegment.Survey,
                 IncludeTextAnalytics = false
-            }, ct);
+            }, actorUserId: null, ct);
         }
         catch (Exception ex)
         {

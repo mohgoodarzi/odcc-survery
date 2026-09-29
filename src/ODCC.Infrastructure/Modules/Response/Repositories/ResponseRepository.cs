@@ -83,6 +83,27 @@ public sealed class ResponseRepository(ResponseDbContext dbContext) : IResponseR
                 && s.RespondentUserId == respondentUserId
                 && s.Status == ResponseStatus.Submitted, ct);
 
+    /// <summary>
+    /// نشست ارسال‌شده‌ی متعلق به یک دعوت‌نامه. در نظرسنجی‌های ناشناس،
+    /// دعوت‌نامه تنها کلید منطقی پاسخ‌گو است (شناسه‌ای ذخیره نمی‌شود).
+    /// </summary>
+    public Task<ResponseSessionEntity?> FindSubmittedByDistributionAsync(Guid distributionId, CancellationToken ct = default) =>
+        _dbContext.Sessions
+            .FirstOrDefaultAsync(s =>
+                s.DistributionId == distributionId
+                && s.Status == ResponseStatus.Submitted, ct);
+
+    /// <summary>
+    /// نشست در حال تکمیلِ متعلق به یک دعوت‌نامه (برای از سرگیری در حالت ناشناس).
+    /// </summary>
+    public Task<ResponseSessionEntity?> FindInProgressByDistributionAsync(Guid distributionId, CancellationToken ct = default) =>
+        _dbContext.Sessions
+            .Include(s => s.Answers)
+            .ThenInclude(a => a.Selections)
+            .FirstOrDefaultAsync(s =>
+                s.DistributionId == distributionId
+                && s.Status == ResponseStatus.InProgress, ct);
+
     public async Task<IReadOnlyList<ResponseSessionEntity>> ListByRespondentAsync(Guid respondentUserId, CancellationToken ct = default) =>
         await _dbContext.Sessions
             .AsNoTracking()

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ODCC.Infrastructure.Modules.Response.Persistence;
 
@@ -11,9 +12,11 @@ using ODCC.Infrastructure.Modules.Response.Persistence;
 namespace ODCC.Infrastructure.Modules.Response.Persistence.Migrations
 {
     [DbContext(typeof(ResponseDbContext))]
-    partial class ResponseDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260929073541_AddSessionDistributionId")]
+    partial class AddSessionDistributionId
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

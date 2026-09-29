@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using ODCC.Application.Abstractions;
+using ODCC.Application.Authorization;
 using ODCC.Application.Modules.Organization.Abstractions;
 using ODCC.Application.Modules.Reporting.Abstractions;
 using ODCC.Application.Modules.Reporting.Dtos;
@@ -20,6 +21,10 @@ namespace ODCC.Infrastructure.Modules.Reporting.Services;
 ///   <item>جمع‌آوری داده، رندر، ذخیره‌ی فایل، ثبت موفقیت/شکست و ذخیره.</item>
 /// </list>
 ///
+/// **مرز سازمانی (fail-closed):** خواندن تعاریف و خروجی‌ها فقط در صورت
+/// قرارگیری داخل دامنه‌ی سازمانی کاربر مجاز است. مسیر سازمانی هرگز از
+/// کلاینت نمی‌آید و در صورت نبودن لنگر معتبر، هیچ داده‌ای برنمی‌گردد.
+///
 /// **حریم خصوصی:** داده‌ی گزارش فقط از طریق <see cref="IReportDataAssembler"/>
 /// از تجمع‌های تحلیلات جمع می‌شود. هیچ شناسه‌ی پاسخ‌گو در خروجی نیست.
 /// </summary>
@@ -30,6 +35,7 @@ public sealed class ReportingService(
     IEnumerable<IReportRenderer> renderers,
     IReportArtifactStore artifactStore,
     IOrgUnitRepository orgUnitRepository,
+    IOrgScopeProvider orgScopeProvider,
     ICurrentUserService currentUserService,
     IReportingUnitOfWork unitOfWork,
     ILogger<ReportingService> logger) : IReportingService
@@ -41,6 +47,7 @@ public sealed class ReportingService(
         .ToDictionary(r => r.Format);
     private readonly IReportArtifactStore _artifactStore = artifactStore;
     private readonly IOrgUnitRepository _orgUnitRepository = orgUnitRepository;
+    private readonly IOrgScopeProvider _orgScopeProvider = orgScopeProvider;
     private readonly ICurrentUserService _currentUserService = currentUserService;
     private readonly IReportingUnitOfWork _unitOfWork = unitOfWork;
     private readonly ILogger<ReportingService> _logger = logger;
@@ -54,8 +61,11 @@ public sealed class ReportingService(
     public async Task<PagedResult<ReportDefinitionDto>> SearchAsync(
         ReportSearchRequest request, CancellationToken ct = default)
     {
-        var totalCount = await _definitionRepository.CountAsync(request, ct);
-        var definitions = await _definitionRepository.SearchAsync(request, ct);
+        // مرز سازمانی (fail-closed): فقط تعاریف داخل دامنه‌ی قابل‌مشاهده.
+        var scope = await _orgScopeProvider.GetCurrentScopeAsync(ct);
+
+        var totalCount = await _definitionRepository.CountAsync(request, scope, ct);
+        var definitions = await _definitionRepository.SearchAsync(request, scope, ct);
 
         var recentExecutions = await LoadRecentSuccessAsync(definitions, ct);
 
@@ -75,13 +85,15 @@ public sealed class ReportingService(
     /// <inheritdoc/>
     public async Task<Result<ReportDefinitionDto>> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
-        var definition = await _definitionRepository.GetByIdAsync(id, ct);
-        if (definition is null)
+        var definition = await LoadAccessibleDefinitionAsync(id, ct);
+        if (definition.IsFailure)
         {
-            return Result.Failure<ReportDefinitionDto>("report_not_found", "گزارش یافت نشد.");
+            return Result.Failure<ReportDefinitionDto>(definition.Error);
         }
 
-        return Result.Success(ToDto(definition, await LoadLastSuccessAsync(definition.Id, ct)));
+        var entity = definition.Value!;
+
+        return Result.Success(ToDto(entity, await LoadLastSuccessAsync(entity.Id, ct)));
     }
 
     /// <inheritdoc/>
@@ -89,6 +101,10 @@ public sealed class ReportingService(
         SaveReportRequest request, CancellationToken ct = default)
     {
         var scope = await ResolveOrgScopeAsync(request.OrgUnitId, ct);
+        if (scope.IsFailure)
+        {
+            return Result.Failure<ReportDefinitionDto>(scope.Error);
+        }
 
         // گزارش خلاصه‌ی داشبورد به نظرسنجی خاصی محدود نیست؛ حتی اگر کلاینت
         // مقداری فرستاده باشد، اینجا به‌جای تکیه بر اعتبارسنجی API خنثی می‌شود.
@@ -105,8 +121,8 @@ public sealed class ReportingService(
             SurveyId = surveyId,
             From = request.From,
             To = request.To,
-            OrgUnitId = scope.OrgUnitId,
-            OrgUnitPath = scope.OrgUnitPath,
+            OrgUnitId = scope.Value!.OrgUnitId,
+            OrgUnitPath = scope.Value.OrgUnitPath,
             IncludeDescendants = request.IncludeDescendants,
             OwnerUserId = _currentUserService.UserId,
             OwnerUserName = _currentUserService.UserName,
@@ -133,98 +149,102 @@ public sealed class ReportingService(
     public async Task<Result<ReportDefinitionDto>> UpdateAsync(
         Guid id, SaveReportRequest request, CancellationToken ct = default)
     {
-        var definition = await _definitionRepository.GetByIdAsync(id, ct);
-        if (definition is null)
+        var definition = await LoadAccessibleDefinitionAsync(id, ct);
+        if (definition.IsFailure)
         {
-            return Result.Failure<ReportDefinitionDto>("report_not_found", "گزارش یافت نشد.");
+            return Result.Failure<ReportDefinitionDto>(definition.Error);
         }
 
-        if (definition.Status == ReportStatus.Archived)
+        if (definition.Value!.Status == ReportStatus.Archived)
         {
             return Result.Failure<ReportDefinitionDto>("report_archived", "گزارش بایگانی‌شده قابل ویرایش نیست.");
         }
 
         var scope = await ResolveOrgScopeAsync(request.OrgUnitId, ct);
+        if (scope.IsFailure)
+        {
+            return Result.Failure<ReportDefinitionDto>(scope.Error);
+        }
 
         var surveyId = NormalizeSurveyId(request.Type, request.SurveyId);
 
-        var wasActive = definition.Status == ReportStatus.Active;
+        var wasActive = definition.Value.Status == ReportStatus.Active;
 
-        definition.Update(
+        definition.Value.Update(
             request.Name,
             request.Description,
             request.Type,
             request.Format,
             request.Schedule,
             surveyId,
-            surveyCode: definition.SurveyCode,
-            surveyTitle: definition.SurveyTitle,
+            surveyCode: definition.Value.SurveyCode,
+            surveyTitle: definition.Value.SurveyTitle,
             request.From,
             request.To,
-            scope.OrgUnitId,
-            scope.OrgUnitPath,
+            scope.Value!.OrgUnitId,
+            scope.Value.OrgUnitPath,
             request.IncludeDescendants,
             request.RetentionCount);
 
         // وضعیت فعال‌بودن پس از ویرایش حفظ می‌شود مگر آنکه صریحاً خاموش شده باشد.
-        if (wasActive && !request.ActivateImmediately && definition.Status != ReportStatus.Archived)
+        if (wasActive && !request.ActivateImmediately && definition.Value.Status != ReportStatus.Archived)
         {
-            definition.Activate();
+            definition.Value.Activate();
         }
         else if (!wasActive && request.ActivateImmediately)
         {
-            definition.Activate();
+            definition.Value.Activate();
         }
 
-        definition.RaiseUpdatedEvent();
+        definition.Value.RaiseUpdatedEvent();
 
-        _definitionRepository.Update(definition);
+        _definitionRepository.Update(definition.Value);
         await _unitOfWork.SaveChangesAsync(ct);
 
-        return Result.Success(ToDto(definition, await LoadLastSuccessAsync(definition.Id, ct)));
+        return Result.Success(ToDto(definition.Value, await LoadLastSuccessAsync(definition.Value.Id, ct)));
     }
 
     /// <inheritdoc/>
     public async Task<Result<ReportDefinitionDto>> ActivateAsync(Guid id, CancellationToken ct = default)
     {
-        var definition = await _definitionRepository.GetByIdAsync(id, ct);
-        if (definition is null)
+        var definition = await LoadAccessibleDefinitionAsync(id, ct);
+        if (definition.IsFailure)
         {
-            return Result.Failure<ReportDefinitionDto>("report_not_found", "گزارش یافت نشد.");
+            return Result.Failure<ReportDefinitionDto>(definition.Error);
         }
 
-        if (definition.Status == ReportStatus.Archived)
+        if (definition.Value!.Status == ReportStatus.Archived)
         {
             return Result.Failure<ReportDefinitionDto>("report_archived", "گزارش بایگانی‌شده قابل فعال‌سازی نیست.");
         }
 
-        definition.Activate();
-        definition.RaiseActivatedEvent();
+        definition.Value.Activate();
+        definition.Value.RaiseActivatedEvent();
 
-        _definitionRepository.Update(definition);
+        _definitionRepository.Update(definition.Value);
         await _unitOfWork.SaveChangesAsync(ct);
 
-        return Result.Success(ToDto(definition, await LoadLastSuccessAsync(definition.Id, ct)));
+        return Result.Success(ToDto(definition.Value, await LoadLastSuccessAsync(definition.Value.Id, ct)));
     }
 
     /// <inheritdoc/>
     public async Task<Result> ArchiveAsync(Guid id, CancellationToken ct = default)
     {
-        var definition = await _definitionRepository.GetByIdAsync(id, ct);
-        if (definition is null)
+        var definition = await LoadAccessibleDefinitionAsync(id, ct);
+        if (definition.IsFailure)
         {
-            return Result.Failure("report_not_found", "گزارش یافت نشد.");
+            return Result.Failure(definition.Error);
         }
 
-        if (definition.Status == ReportStatus.Archived)
+        if (definition.Value!.Status == ReportStatus.Archived)
         {
             return Result.Success();
         }
 
-        definition.Archive();
-        definition.RaiseArchivedEvent();
+        definition.Value.Archive();
+        definition.Value.RaiseArchivedEvent();
 
-        _definitionRepository.Update(definition);
+        _definitionRepository.Update(definition.Value);
         await _unitOfWork.SaveChangesAsync(ct);
 
         return Result.Success();
@@ -234,13 +254,13 @@ public sealed class ReportingService(
     public async Task<Result<ReportExecutionDto>> ExecuteAsync(
         Guid reportDefinitionId, CancellationToken ct = default)
     {
-        var definition = await _definitionRepository.GetByIdAsync(reportDefinitionId, ct);
-        if (definition is null)
+        var definition = await LoadAccessibleDefinitionAsync(reportDefinitionId, ct);
+        if (definition.IsFailure)
         {
-            return Result.Failure<ReportExecutionDto>("report_not_found", "گزارش یافت نشد.");
+            return Result.Failure<ReportExecutionDto>(definition.Error);
         }
 
-        if (definition.Status == ReportStatus.Archived)
+        if (definition.Value!.Status == ReportStatus.Archived)
         {
             return Result.Failure<ReportExecutionDto>("report_archived", "گزارش بایگانی‌شده قابل اجرا نیست.");
         }
@@ -248,10 +268,10 @@ public sealed class ReportingService(
         // --- ۱. صف: ثبت اجرا پیش از شروع ----------------------------------
         var execution = new ReportExecution
         {
-            ReportDefinitionId = definition.Id,
-            ReportName = definition.Name,
-            ReportType = definition.Type,
-            Format = definition.Format,
+            ReportDefinitionId = definition.Value!.Id,
+            ReportName = definition.Value.Name,
+            ReportType = definition.Value.Type,
+            Format = definition.Value.Format,
             Status = ReportExecutionStatus.Pending,
             QueuedAt = DateTime.UtcNow,
             TriggeredBy = _currentUserService.UserId,
@@ -262,7 +282,7 @@ public sealed class ReportingService(
         await _unitOfWork.SaveChangesAsync(ct);
 
         // --- ۲. اجرا ---------------------------------------------------------
-        var result = await RunExecutionAsync(definition, execution, ct);
+        var result = await RunExecutionAsync(definition.Value, execution, ct);
 
         if (result.IsFailure)
         {
@@ -281,6 +301,20 @@ public sealed class ReportingService(
             return Result.Failure<ReportExecutionDto>("execution_not_found", "اجرای گزارش یافت نشد.");
         }
 
+        // مرز سازمانی (fail-closed): جزئیات اجرا فقط در صورت دسترسی به تعریفِ
+        // آن قابل مشاهده است. مسیر سازمانی از تعریف خوانده می‌شود، نه کلاینت.
+        var definition = await _definitionRepository.GetByIdAsync(execution.ReportDefinitionId, ct);
+        if (definition is null)
+        {
+            return Result.Failure<ReportExecutionDto>("execution_not_found", "اجرای گزارش یافت نشد.");
+        }
+
+        var scope = await _orgScopeProvider.GetCurrentScopeAsync(ct);
+        if (!scope.CanAccess(definition.OrgUnitId, definition.OrgUnitPath))
+        {
+            return Result.Failure<ReportExecutionDto>("execution_not_found", "اجرای گزارش یافت نشد.");
+        }
+
         return Result.Success(ToExecutionDto(execution));
     }
 
@@ -288,8 +322,15 @@ public sealed class ReportingService(
     public async Task<PagedResult<ReportExecutionDto>> SearchExecutionsAsync(
         ExecutionSearchRequest request, CancellationToken ct = default)
     {
-        var totalCount = await _executionRepository.CountAsync(request, ct);
-        var executions = await _executionRepository.SearchAsync(request, ct);
+        // مرز سازمانی (fail-closed): اجراها فقط برای تعاریف داخل دامنه‌ی
+        // قابل‌مشاهده برمی‌گردند. اگر کاربر دامنه‌ی قابل‌مشاهده‌ای ندارد،
+        // نتیجه‌ی خالی است.
+        var scope = await _orgScopeProvider.GetCurrentScopeAsync(ct);
+
+        var visibleDefinitionIds = await _definitionRepository.ListVisibleIdsAsync(scope, ct);
+
+        var totalCount = await _executionRepository.CountAsync(request, visibleDefinitionIds, ct);
+        var executions = await _executionRepository.SearchAsync(request, visibleDefinitionIds, ct);
 
         return new PagedResult<ReportExecutionDto>
         {
@@ -305,6 +346,20 @@ public sealed class ReportingService(
     {
         var execution = await _executionRepository.GetByIdAsync(executionId, ct);
         if (execution is null)
+        {
+            return Result.Failure<ReportArtifact>("execution_not_found", "اجرای گزارش یافت نشد.");
+        }
+
+        // مرز سازمانی (fail-closed): خروجی فقط در صورت دسترسی به تعریفِ آن
+        // اجرا قابل دانلود است. مسیر سازمانی از تعریف خوانده می‌شود، نه کلاینت.
+        var definition = await _definitionRepository.GetByIdAsync(execution.ReportDefinitionId, ct);
+        if (definition is null)
+        {
+            return Result.Failure<ReportArtifact>("execution_not_found", "اجرای گزارش یافت نشد.");
+        }
+
+        var artifactScope = await _orgScopeProvider.GetCurrentScopeAsync(ct);
+        if (!artifactScope.CanAccess(definition.OrgUnitId, definition.OrgUnitPath))
         {
             return Result.Failure<ReportArtifact>("execution_not_found", "اجرای گزارش یافت نشد.");
         }
@@ -511,17 +566,56 @@ public sealed class ReportingService(
         return $"{stem}-{executionId}{extension}";
     }
 
-    /// <summary>حل مسیر سازمانی تعریف (در صورت انتخاب واحد).</summary>
-    private async Task<(Guid? OrgUnitId, string? OrgUnitPath)> ResolveOrgScopeAsync(Guid? orgUnitId, CancellationToken ct)
+    /// <summary>
+    /// بارگذاری تعریف گزارش با بررسی مرز سازمانی (fail-closed). پیام خطا
+    /// عمداً «یافت نشد» است تا وجود گزارش‌های خارج از دامنه فاش نشود.
+    /// </summary>
+    private async Task<Result<ReportDefinition>> LoadAccessibleDefinitionAsync(Guid id, CancellationToken ct)
     {
-        if (orgUnitId is null || orgUnitId == Guid.Empty)
+        var definition = await _definitionRepository.GetByIdAsync(id, ct);
+        if (definition is null)
         {
-            return (null, null);
+            return Result.Failure<ReportDefinition>("report_not_found", "گزارش یافت نشد.");
         }
 
+        var scope = await _orgScopeProvider.GetCurrentScopeAsync(ct);
+        if (!scope.CanAccess(definition.OrgUnitId, definition.OrgUnitPath))
+        {
+            return Result.Failure<ReportDefinition>("report_not_found", "گزارش یافت نشد.");
+        }
+
+        return Result.Success(definition);
+    }
+
+    /// <summary>
+    /// حل مسیر سازمانی تعریف. اگر کاربر واحدی انتخاب نکرده باشد، دامنه‌ی
+    /// قابل‌مشاهده‌ی خودش جایگزین می‌شود تا هرگز گزارشی فراتر از دامنه‌اش
+    /// ساخته نشود. اگر واحدی انتخاب کرده باشد، باید داخل دامنه‌اش باشد
+    /// (fail-closed). مسیر هرگز از کلاینت نمی‌آید.
+    /// </summary>
+    private async Task<Result<(Guid? OrgUnitId, string? OrgUnitPath)>> ResolveOrgScopeAsync(
+        Guid? orgUnitId, CancellationToken ct)
+    {
+        var scope = await _orgScopeProvider.GetCurrentScopeAsync(ct);
+
+        if (orgUnitId is null || orgUnitId == Guid.Empty)
+        {
+            return Result.Success(scope.HasVisibleOrgScope
+                ? (scope.AnchorOrgUnitId, scope.AnchorPath)
+                : ((Guid? OrgUnitId, string? OrgUnitPath))(null, null));
+        }
+
+        // دامنه‌ی Company نامحدود است؛ دامنه‌ی Own یا بدون لنگر معتبر نمی‌تواند
+        // گزارشی به واحد خاصی متصل کند.
         var path = await _orgUnitRepository.GetPathAsync(orgUnitId.Value, ct);
 
-        return (orgUnitId, path);
+        if (!scope.CanAccess(orgUnitId, path))
+        {
+            return Result.Failure<(Guid? OrgUnitId, string? OrgUnitPath)>(
+                "access_denied", "شما به واحد سازمانی انتخاب‌شده دسترسی ندارید.");
+        }
+
+        return Result.Success((orgUnitId, path));
     }
 
     /// <summary>آخرین اجرای موفق یک تعریف (برای نمایش در فهرست).</summary>

@@ -51,9 +51,21 @@ public sealed class CampaignRepository(CampaignDbContext dbContext) : ICampaignR
     public Task<CampaignEntity?> FindByCodeAsync(string code, CancellationToken ct = default) =>
         _dbContext.Campaigns.FirstOrDefaultAsync(c => c.Code == code, ct);
 
-    public async Task<IReadOnlyList<CampaignEntity>> SearchAsync(CampaignSearchRequest request, CancellationToken ct = default)
+    public async Task<IReadOnlyList<CampaignEntity>> SearchAsync(CampaignSearchRequest request, CancellationToken ct = default) =>
+        await SearchAsync(request, scope: null, ct);
+
+    /// <summary>
+    /// جستجوی کمپین‌ها در دامنه‌ی سازمانی قابل‌مشاهده (fail-closed).
+    /// </summary>
+    /// <param name="request">درخواست جستجو.</param>
+    /// <param name="scope">
+    /// دامنه‌ی سازمانی قابل‌مشاهده (fail-closed). <c>null</c> یعنی بدون محدودیت.
+    /// </param>
+    /// <param name="ct">توکن لغو.</param>
+    public async Task<IReadOnlyList<CampaignEntity>> SearchAsync(
+        CampaignSearchRequest request, ODCC.Application.Authorization.OrgScope? scope, CancellationToken ct = default)
     {
-        var query = BuildSearchQuery(request);
+        var query = BuildSearchQuery(request, scope);
 
         var page = Math.Max(request.Page, 1);
         var pageSize = Math.Clamp(request.PageSize, 1, 100);
@@ -66,7 +78,11 @@ public sealed class CampaignRepository(CampaignDbContext dbContext) : ICampaignR
     }
 
     public async Task<int> CountAsync(CampaignSearchRequest request, CancellationToken ct = default) =>
-        await BuildSearchQuery(request).CountAsync(ct);
+        await CountAsync(request, scope: null, ct);
+
+    public async Task<int> CountAsync(
+        CampaignSearchRequest request, ODCC.Application.Authorization.OrgScope? scope, CancellationToken ct = default) =>
+        await BuildSearchQuery(request, scope).CountAsync(ct);
 
     /// <summary>کمپین‌های «در حال اجرا» که حداقل یک یادآور سررسیده دارند (برای پردازش دوره‌ای).</summary>
     public async Task<IReadOnlyList<CampaignEntity>> GetDueForRemindersAsync(CancellationToken ct = default)
@@ -80,11 +96,28 @@ public sealed class CampaignRepository(CampaignDbContext dbContext) : ICampaignR
             .ToListAsync(ct);
     }
 
-    private IQueryable<CampaignEntity> BuildSearchQuery(CampaignSearchRequest request)
+    private IQueryable<CampaignEntity> BuildSearchQuery(
+        CampaignSearchRequest request, ODCC.Application.Authorization.OrgScope? scope = null)
     {
         var query = _dbContext.Campaigns
             .Include(c => c.Localizations)
             .AsNoTracking();
+
+        // مرز سازمانی (fail-closed): دامنه‌ی Company نامحدود؛ دامنه‌ی دارای
+        // لنگر فقط زیردرخت لنگر را می‌بیند؛ دامنه‌ی Own/بدون لنگر هیچ چیزی.
+        // کمپین‌های بدون مالک سازمانی (قبل از این رفتار) فقط Company می‌بیند.
+        if (scope is not null && !scope.IsUnrestricted)
+        {
+            if (!scope.HasVisibleOrgScope)
+            {
+                query = query.Where(c => false);
+            }
+            else
+            {
+                var prefix = scope.VisiblePathPrefix!;
+                query = query.Where(c => c.OrgUnitPath != null && c.OrgUnitPath.StartsWith(prefix));
+            }
+        }
 
         if (request.Status is { } status)
         {

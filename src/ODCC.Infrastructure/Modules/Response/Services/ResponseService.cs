@@ -1,4 +1,6 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.Text.Json;
 using ODCC.Application.Abstractions;
 using ODCC.Application.Languages;
 using ODCC.Application.Modules.Campaign.Abstractions;
@@ -129,18 +131,26 @@ public sealed class ResponseService(
 
     public async Task<Result<ResponseSessionDto>> StartSessionAsync(StartSessionRequest request, CancellationToken ct = default)
     {
+        var survey = await LoadRespondableSurveyAsync(request.SurveyId, ct);
+        if (survey is null)
+        {
+            return Result.Failure<ResponseSessionDto>("survey_not_respondable", "نظرسنجی برای پاسخ‌گویی در دسترس نیست.");
+        }
+
+        // نظرسنجی ناشناس با «توکن قابلیت» کار می‌کند: شناسه‌ی نشست همان
+        // اثبات مالکیت است و نیازی به ورود به سامانه نیست. در نظرسنجی‌های
+        // شناسایی‌شده، شناسه‌ی کاربر برای سیاست‌های پاسخ یگانه لازم است.
+        if (survey.IsAnonymous)
+        {
+            return await StartAnonymousSessionAsync(survey, request, ct);
+        }
+
         if (!_currentUserService.IsAuthenticated || _currentUserService.UserId is null)
         {
             return Result.Failure<ResponseSessionDto>("authentication_required", "برای پاسخ‌گویی باید وارد سامانه شوید.");
         }
 
         var userId = _currentUserService.UserId.Value;
-
-        var survey = await LoadRespondableSurveyAsync(request.SurveyId, ct);
-        if (survey is null)
-        {
-            return Result.Failure<ResponseSessionDto>("survey_not_respondable", "نظرسنجی برای پاسخ‌گویی در دسترس نیست.");
-        }
 
         // --- اعمال دعوت‌نامه (در صورت ورود از طریق کمپین) ------------------------
         // در نظرسنجی‌های غیرناشناس، دعوت‌نامه باید متعلق به این کاربر و این
@@ -175,6 +185,8 @@ public sealed class ResponseService(
         var source = ResolveSource(request.Source, distribution?.Channel);
 
         // --- سیاست پاسخ یگانه ---------------------------------------------------
+        // نظرسنجی ناشناس را جستجوی مبتنی بر کاربر پوشش نمی‌دهد (شناسه‌ای ذخیره
+        // نمی‌شود)؛ مسیر ناشناس این سیاست را جداگانه اعمال می‌کند.
         var submitted = await _responseRepository.FindSubmittedAsync(survey.Id, userId, ct);
 
         if (submitted is not null)
@@ -244,6 +256,98 @@ public sealed class ResponseService(
 
         session.RaiseDomainEvent(new ResponseStartedEvent(
             session.Id, survey.Id, survey.Code, distribution?.CampaignId, distribution?.Id, isAnonymous, userId));
+
+        await _responseRepository.AddAsync(session, ct);
+        await _unitOfWork.SaveChangesAsync(ct);
+
+        return Result.Success(ToDto(session));
+    }
+
+    /// <summary>
+    /// شروع نشست برای نظرسنجی ناشناس. هیچ شناسه‌ای ذخیره نمی‌شود، پس
+    /// «مالکیت» نشست با داشتن شناسه‌ی آن اثبات می‌شود (توکن قابلیت) و
+    /// دعوت‌نامه، به‌جای کاربر، کلیدی برای سیاست پاسخ یگانه است.
+    /// </summary>
+    private async Task<Result<ResponseSessionDto>> StartAnonymousSessionAsync(
+        Domain.Modules.Survey.Entities.Survey survey,
+        StartSessionRequest request,
+        CancellationToken ct)
+    {
+        // در حالت ناشناس، دعوت‌نامه باید به همین نظرسنجی تعلق داشته باشد.
+        // خودِ دعوت‌نامه توکن قابلیت است.
+        DistributionContext? distribution = null;
+
+        if (request.DistributionId is { } distributionId)
+        {
+            distribution = await LoadAnonymousDistributionAsync(distributionId, survey.Id, ct);
+
+            if (distribution is null)
+            {
+                return Result.Failure<ResponseSessionDto>("distribution_not_valid", "دعوت‌نامه معتبر نیست.");
+            }
+        }
+        else if (request.CampaignId is { } campaignId)
+        {
+            var campaign = await _campaignRepository.GetByIdAsync(campaignId, ct);
+            if (campaign is null || campaign.SurveyId != survey.Id)
+            {
+                return Result.Failure<ResponseSessionDto>("campaign_not_valid", "کمپین دعوت‌کننده معتبر نیست.");
+            }
+
+            distribution = null;
+        }
+
+        var source = ResolveSource(request.Source, distribution?.Channel);
+
+        // --- سیاست پاسخ یگانه (مبتنی بر دعوت‌نامه) -----------------------------
+        // نظرسنجی ناشناس شناسه‌ای ذخیره نمی‌کند، پس دعوت‌نامه شناسه‌ی منطقی
+        // پاسخ‌گو است: هر دعوت‌نامه فقط یک نشست می‌سازد.
+        if (distribution is not null && !survey.AllowEditResponse)
+        {
+            var submittedByInvitation = await _responseRepository.FindSubmittedByDistributionAsync(distribution.Id, ct);
+            if (submittedByInvitation is not null)
+            {
+                return Result.Failure<ResponseSessionDto>("response_already_submitted", "این دعوت‌نامه قبلاً استفاده شده است.");
+            }
+        }
+
+        // --- از سرگیری نشست نیمه‌تمام (مبتنی بر دعوت‌نامه) -----------------------
+        if (distribution is not null)
+        {
+            var inProgressByInvitation = await _responseRepository.FindInProgressByDistributionAsync(distribution.Id, ct);
+            if (inProgressByInvitation is not null)
+            {
+                inProgressByInvitation.Source = source;
+                inProgressByInvitation.ResponseLanguage = request.ResponseLanguage;
+                inProgressByInvitation.Touch();
+
+                _responseRepository.Update(inProgressByInvitation);
+                await _unitOfWork.SaveChangesAsync(ct);
+
+                return Result.Success(ToDto(inProgressByInvitation));
+            }
+        }
+
+        var session = new ResponseSessionEntity
+        {
+            SurveyId = survey.Id,
+            SurveyCode = survey.Code,
+            CampaignId = distribution?.CampaignId,
+            CampaignCode = distribution?.CampaignCode,
+            RespondentUserId = null,
+            RespondentEmployeeId = null,
+            RespondentDisplayName = null,
+            IsAnonymous = true,
+            Status = ResponseStatus.InProgress,
+            Source = source,
+            ResponseLanguage = request.ResponseLanguage,
+            DistributionId = distribution?.Id,
+            StartedAt = DateTime.UtcNow,
+            LastActivityAt = DateTime.UtcNow
+        };
+
+        session.RaiseDomainEvent(new ResponseStartedEvent(
+            session.Id, survey.Id, survey.Code, distribution?.CampaignId, distribution?.Id, true, null));
 
         await _responseRepository.AddAsync(session, ct);
         await _unitOfWork.SaveChangesAsync(ct);
@@ -638,6 +742,13 @@ public sealed class ResponseService(
                 return Result.Failure("answer_item_unknown", "یکی از پاسخ‌ها به آیتمی تعلق دارد که در این پرسشنامه وجود ندارد.");
             }
 
+            // پاسخِ خالی به‌عنوان «پاسخ داده‌شده» حساب نمی‌شود: پاسخ باید واقعاً
+            // مقدار داشته باشد تا سؤال اجباری پاسخ داده شده تلقی شود.
+            if (!AnswerHasValue(answerRequest))
+            {
+                continue;
+            }
+
             answeredItemIds.Add(item.Id);
 
             var shapeError = ValidateAnswerShape(item, answerRequest, structure);
@@ -678,6 +789,12 @@ public sealed class ResponseService(
         return Result.Success();
     }
 
+    /// <summary>آیا این پاسخ واقعاً مقداری دارد (متن، عدد یا گزینه)؟</summary>
+    private static bool AnswerHasValue(SaveAnswerRequest answer) =>
+        !string.IsNullOrWhiteSpace(answer.TextValue)
+        || answer.NumericValue.HasValue
+        || answer.SelectedOptionIds is { Count: > 0 };
+
     /// <summary>بررسی همخوانی شکل پاسخ با نوع سؤال و مجاز بودن گزینه‌ها.</summary>
     private static (string code, string message)? ValidateAnswerShape(
         QuestionnaireItemDto item,
@@ -707,7 +824,7 @@ public sealed class ResponseService(
                 return ("answer_shape_invalid", "پاسخ به این سؤال باید گزینه‌ی انتخاب‌شده داشته باشد.");
             }
 
-            if (!structure.TryGetOptions(item.QuestionId, out var allowed) || allowed.Count == 0)
+            if (!structure.TryGetOptions(item.QuestionId, item.QuestionVersionNumber, out var allowed) || allowed.Count == 0)
             {
                 return ("answer_options_unavailable", "گزینه‌های این سؤال در دسترس نیست.");
             }
@@ -735,7 +852,7 @@ public sealed class ResponseService(
                 return ("answer_shape_invalid", "پاسخ به سؤال امتیازدهی باید عدد باشد.");
             }
 
-            var scaleMax = structure.GetScaleMax(item.QuestionId);
+            var scaleMax = structure.GetScaleMax(item.QuestionId, item.QuestionVersionNumber);
 
             if (scaleMax > 0)
             {
@@ -782,7 +899,7 @@ public sealed class ResponseService(
     {
         if (item.QuestionType.HasOptions()
             && answerRequest.SelectedOptionIds is { Count: > 0 }
-            && structure.TryGetOptions(item.QuestionId, out var allowed))
+            && structure.TryGetOptions(item.QuestionId, item.QuestionVersionNumber, out var allowed))
         {
             var byId = allowed.ToDictionary(o => o.Id);
             var selected = answerRequest.SelectedOptionIds
@@ -836,9 +953,13 @@ public sealed class ResponseService(
                 continue;
             }
 
+            // کد گزینه‌های انتخاب‌شده: قوانین انشعاب روی «کد» گزینه تعریف می‌شوند،
+            // نه شناسه‌ی آن.
+            var selectedCodes = ResolveSelectedOptionCodes(structure, item, sourceAnswer);
+
             foreach (var rule in item.BranchingRules)
             {
-                if (IsBranchActive(rule.Condition, rule.ExpectedValue, item.QuestionType, sourceAnswer))
+                if (IsBranchActive(rule.Condition, rule.ExpectedValue, item.QuestionType, sourceAnswer, selectedCodes))
                 {
                     skipped.Add(rule.TargetItemId);
                 }
@@ -848,32 +969,57 @@ public sealed class ResponseService(
         return skipped;
     }
 
+    /// <summary>کد گزینه‌های انتخاب‌شده برای یک آیتم (برای ارزیابی انشعاب).</summary>
+    private static List<string> ResolveSelectedOptionCodes(
+        QuestionnaireStructure structure,
+        QuestionnaireItemDto item,
+        SaveAnswerRequest answer)
+    {
+        if (!item.QuestionType.HasOptions()
+            || answer.SelectedOptionIds is not { Count: > 0 } selectedIds
+            || !structure.TryGetOptions(item.QuestionId, item.QuestionVersionNumber, out var options))
+        {
+            return [];
+        }
+
+        var codeById = options.ToDictionary(o => o.Id, o => o.Code);
+        return selectedIds
+            .Where(codeById.ContainsKey)
+            .Select(id => codeById[id])
+            .ToList();
+    }
+
     /// <summary>آیا شرط انشعاب نسبت به پاسخ داده‌شده برقرار است؟</summary>
-    private static bool IsBranchActive(BranchingCondition condition, string expected, QuestionType questionType, SaveAnswerRequest answer)
+    private static bool IsBranchActive(
+        BranchingCondition condition,
+        string expected,
+        QuestionType questionType,
+        SaveAnswerRequest answer,
+        List<string> selectedCodes)
     {
         var comparison = StringComparison.Ordinal;
 
         return (questionType, condition) switch
         {
-            // سؤال‌های گزینه‌ای: مقایسه روی کد گزینه.
+            // سؤال‌های گزینه‌ای: مقایسه روی کد گزینه (نه شناسه‌ی آن).
             (QuestionType.SingleChoice, BranchingCondition.Equals) =>
-                answer.SelectedOptionIds is { Count: 1 } list && list[0].ToString().Equals(expected, comparison),
+                selectedCodes is { Count: 1 } codes && codes[0].Equals(expected, comparison),
             (QuestionType.SingleChoice, BranchingCondition.NotEquals) =>
-                answer.SelectedOptionIds is not { Count: > 0 } || !answer.SelectedOptionIds[0].ToString().Equals(expected, comparison),
+                selectedCodes is not { Count: > 0 } codes || !codes[0].Equals(expected, comparison),
             (QuestionType.MultipleChoice, BranchingCondition.Contains) =>
-                answer.SelectedOptionIds is { Count: > 0 } list && list.Any(id => id.ToString().Equals(expected, comparison)),
+                selectedCodes.Count > 0 && selectedCodes.Any(code => code.Equals(expected, comparison)),
             (QuestionType.MultipleChoice, BranchingCondition.Equals) =>
-                answer.SelectedOptionIds is { Count: 1 } list && list[0].ToString().Equals(expected, comparison),
+                selectedCodes is { Count: 1 } codes && codes[0].Equals(expected, comparison),
 
             // سؤال‌های عددی/امتیازدهی.
             (QuestionType.Rating or QuestionType.Number, BranchingCondition.Equals) =>
-                answer.NumericValue.HasValue && answer.NumericValue.Value == decimal.Parse(expected, CultureInfo.InvariantCulture),
+                TryParseDecimal(expected, out var e) && answer.NumericValue.HasValue && answer.NumericValue.Value == e,
             (QuestionType.Rating or QuestionType.Number, BranchingCondition.NotEquals) =>
-                !answer.NumericValue.HasValue || answer.NumericValue.Value != decimal.Parse(expected, CultureInfo.InvariantCulture),
+                TryParseDecimal(expected, out var e) && (!answer.NumericValue.HasValue || answer.NumericValue.Value != e),
             (QuestionType.Rating or QuestionType.Number, BranchingCondition.GreaterThan) =>
-                answer.NumericValue.HasValue && answer.NumericValue.Value > decimal.Parse(expected, CultureInfo.InvariantCulture),
+                TryParseDecimal(expected, out var e) && answer.NumericValue.HasValue && answer.NumericValue.Value > e,
             (QuestionType.Rating or QuestionType.Number, BranchingCondition.LessThan) =>
-                answer.NumericValue.HasValue && answer.NumericValue.Value < decimal.Parse(expected, CultureInfo.InvariantCulture),
+                TryParseDecimal(expected, out var e) && answer.NumericValue.HasValue && answer.NumericValue.Value < e,
 
             // سؤال‌های متنی و بله/خیر.
             (_, BranchingCondition.Equals) =>
@@ -884,12 +1030,22 @@ public sealed class ResponseService(
         };
     }
 
+    /// <summary>
+    /// تجزیه‌ی امن مقدار عددی قانون انشعاب. مقدار نامعتبر باعث شکست ارسال نمی‌شود —
+    /// قانون نامعتبر فقط برقرار نشده تلقی می‌شود (رفتار fail-safe).
+    /// </summary>
+    private static bool TryParseDecimal(string? value, out decimal result) =>
+        decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out result);
+
     /// <summary>تبدیل یک آیتم پرسشنامه به DTO پاسخ‌گو به‌همراه گزینه‌ها.</summary>
     private static RespondentItemDto MapRespondentItem(QuestionnaireItemDto item, QuestionnaireStructure structure)
     {
-        var options = item.QuestionType.HasOptions() && structure.TryGetOptions(item.QuestionId, out var itemOptions)
-            ? itemOptions
-            : [];
+        // گزینه‌ها و طیف امتیازدهی از نسخه‌ی چسبیده‌ی آیتم خوانده می‌شوند تا
+        // ساختار پاسخ‌گویی در طول عمر نظرسنجی ثابت بماند.
+        var options = item.QuestionType.HasOptions()
+            && structure.TryGetOptions(item.QuestionId, item.QuestionVersionNumber, out var itemOptions)
+                ? itemOptions
+                : [];
 
         return new RespondentItemDto
         {
@@ -901,7 +1057,7 @@ public sealed class ResponseService(
             DisplayOrder = item.DisplayOrder,
             IsRequired = item.IsRequired,
             Text = string.IsNullOrWhiteSpace(item.TitleOverride) ? item.QuestionText : item.TitleOverride,
-            ScaleMax = structure.GetScaleMax(item.QuestionId),
+            ScaleMax = structure.GetScaleMax(item.QuestionId, item.QuestionVersionNumber),
             Options = options
                 .Select(o => new RespondentOptionDto
                 {
@@ -1108,10 +1264,49 @@ public sealed class ResponseService(
             .SelectMany(s => s.Items)
             .ToDictionary(i => i.Id);
 
-        /// <summary>گزینه‌های یک سؤال (مرتب‌شده بر اساس ترتیب نمایش).</summary>
-        public bool TryGetOptions(Guid questionId, out IReadOnlyList<QuestionOptionDto> options)
+        /// <summary>
+        /// آیا سؤال برای این آیتم در دسترس است؟ آیتم‌ها به نسخه‌ی مشخصی از
+        /// سؤال چسبیده‌اند (<see cref="QuestionnaireItemDto.QuestionVersionNumber"/>).
+        /// </summary>
+        public bool TryGetQuestion(Guid questionId, int versionNumber, [NotNullWhen(true)] out Question? question)
         {
-            if (questions.TryGetValue(questionId, out var question))
+            if (!questions.TryGetValue(questionId, out var found))
+            {
+                question = null;
+                return false;
+            }
+
+            // اگر نسخه‌ی چسبیده با نسخه‌ی فعلی سؤال برابر بود، خود سؤال معتبر است.
+            // در غیر این صورت باید نسخه‌ی تاریخی از روی تصویر لحظه‌ای بازسازی شود.
+            if (found.CurrentVersionNumber == versionNumber)
+            {
+                question = found;
+                return true;
+            }
+
+            question = ReconstructVersion(found, versionNumber);
+            return question is not null;
+        }
+
+        /// <summary>گزینه‌های یک سؤال (مرتب‌شده بر اساس ترتیب نمایش).</summary>
+        public bool TryGetOptions(Guid questionId, out IReadOnlyList<QuestionOptionDto> options) =>
+            TryGetOptions(questionId, versionNumber: null, out options);
+
+        /// <summary>
+        /// گزینه‌های نسخه‌ی چسبیده‌ی یک آیتم: گزینه‌ها باید از همان نسخه‌ای خوانده
+        /// شوند که در زمان انتشار پرسشنامه معتبر بوده تا ساختار پاسخ‌گویی در طول
+        /// عمر نظرسنجی ثابت بماند.
+        /// </summary>
+        public bool TryGetOptions(Guid questionId, int? versionNumber, out IReadOnlyList<QuestionOptionDto> options)
+        {
+            if (!questions.TryGetValue(questionId, out var question))
+            {
+                options = [];
+                return false;
+            }
+
+            // مسیر سریع: نسخه‌ی فعلی همان نسخه‌ی چسبیده است.
+            if (!versionNumber.HasValue || versionNumber.Value == question.CurrentVersionNumber)
             {
                 options = question.Options
                     .OrderBy(o => o.DisplayOrder)
@@ -1129,12 +1324,137 @@ public sealed class ResponseService(
                 return true;
             }
 
-            options = [];
-            return false;
+            // مسیر تاریخی: گزینه‌ها از تصویر لحظه‌ای نسخه بازسازی می‌شوند.
+            options = LoadVersionedOptions(question, versionNumber.Value);
+            return options.Count > 0;
         }
 
-        /// <summary>حداکثر طیف یک سؤال امتیازدهی.</summary>
+        /// <summary>حداکثر طیف یک سؤال امتیازدهی (نسخه‌ی فعلی).</summary>
         public int GetScaleMax(Guid questionId) =>
             questions.TryGetValue(questionId, out var question) ? question.ScaleMax : 0;
+
+        /// <summary>حداکثر طیف نسخه‌ی چسبیده‌ی یک سؤال امتیازدهی.</summary>
+        public int GetScaleMax(Guid questionId, int versionNumber)
+        {
+            if (!questions.TryGetValue(questionId, out var question))
+            {
+                return 0;
+            }
+
+            return question.CurrentVersionNumber == versionNumber
+                ? question.ScaleMax
+                : GetVersionedScaleMax(question, versionNumber);
+        }
+
+        /// <summary>
+        /// بازسازی یک سؤال از روی تصویر لحظه‌ای نسخه. این کار فقط زمانی لازم می‌شود
+        /// که سؤال پس از انتشار پرسشنامه ویرایش شده باشد.
+        /// </summary>
+        private static Question? ReconstructVersion(Question question, int versionNumber)
+        {
+            var version = question.Versions.FirstOrDefault(v => v.VersionNumber == versionNumber);
+            if (version is null)
+            {
+                return null;
+            }
+
+            try
+            {
+                using var document = JsonDocument.Parse(version.Snapshot);
+
+                if (!document.RootElement.TryGetProperty("scaleMax", out var scaleMaxElement)
+                    || !document.RootElement.TryGetProperty("optionTexts", out var optionsElement))
+                {
+                    return null;
+                }
+
+                var reconstructed = new Question
+                {
+                    Id = question.Id,
+                    Code = question.Code,
+                    Type = question.Type,
+                    ScaleMax = scaleMaxElement.GetInt32(),
+                    CurrentVersionNumber = versionNumber
+                };
+
+                var order = 0;
+                foreach (var option in optionsElement.EnumerateArray())
+                {
+                    var code = option.TryGetProperty("code", out var codeElement)
+                        ? codeElement.GetString() ?? string.Empty
+                        : string.Empty;
+
+                    var optionId = option.TryGetProperty("id", out var idElement)
+                        && Guid.TryParse(idElement.GetString(), out var parsedId)
+                            ? parsedId
+                            : Guid.CreateVersion7();
+
+                    var optionEntity = new QuestionOption
+                    {
+                        Id = optionId,
+                        Code = code,
+                        DisplayOrder = order++
+                    };
+
+                    // متن گزینه از همان تصویر لحظه‌ای (غیر محلی‌شده) استفاده می‌کند تا
+                    // گزینه‌های تاریخی دقیقاً همان نسخه‌ی زمان پاسخ‌گویی باشند.
+                    if (option.TryGetProperty("text", out var textElement))
+                    {
+                        optionEntity.SetLocalization(Language.Fa, textElement.GetString() ?? code);
+                    }
+
+                    reconstructed.Options.Add(optionEntity);
+                }
+
+                return reconstructed;
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+        }
+
+        private static List<QuestionOptionDto> LoadVersionedOptions(Question question, int versionNumber)
+        {
+            var reconstructed = ReconstructVersion(question, versionNumber);
+            if (reconstructed is null)
+            {
+                return [];
+            }
+
+            return reconstructed.Options
+                .OrderBy(o => o.DisplayOrder)
+                .Select(o => new QuestionOptionDto
+                {
+                    Id = o.Id,
+                    Code = o.Code,
+                    DisplayOrder = o.DisplayOrder,
+                    Text = o.Localizations.Pick(Language.Fa)?.Text
+                        ?? o.Localizations.FirstOrDefault()?.Text
+                        ?? o.Code
+                })
+                .ToList();
+        }
+
+        private static int GetVersionedScaleMax(Question question, int versionNumber)
+        {
+            var version = question.Versions.FirstOrDefault(v => v.VersionNumber == versionNumber);
+            if (version is null)
+            {
+                return question.ScaleMax;
+            }
+
+            try
+            {
+                using var document = JsonDocument.Parse(version.Snapshot);
+                return document.RootElement.TryGetProperty("scaleMax", out var scaleMaxElement)
+                    ? scaleMaxElement.GetInt32()
+                    : question.ScaleMax;
+            }
+            catch (JsonException)
+            {
+                return question.ScaleMax;
+            }
+        }
     }
 }

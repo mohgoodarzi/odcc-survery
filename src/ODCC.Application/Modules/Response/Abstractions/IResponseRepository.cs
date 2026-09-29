@@ -25,7 +25,13 @@ public interface IResponseRepository : IRepository<ResponseSessionEntity>
     /// <summary>نشست ارسال‌شده‌ی یک کاربر برای یک نظرسنجی.</summary>
     Task<ResponseSessionEntity?> FindSubmittedAsync(Guid surveyId, Guid respondentUserId, CancellationToken ct = default);
 
-    /// <summary>همه‌ی نشست‌های یک کاربر (برای محاسبه‌ی وضعیت پاسخ به نظرسنجی‌های باز).</summary>
+    /// <summary>نشست ارسال‌شده‌ی یک دعوت‌نامه (برای نظرسنجی‌های ناشناس).</summary>
+    Task<ResponseSessionEntity?> FindSubmittedByDistributionAsync(Guid distributionId, CancellationToken ct = default);
+
+    /// <summary>نشست در حال تکمیلِ یک دعوت‌نامه (برای نظرسنجی‌های ناشناس).</summary>
+    Task<ResponseSessionEntity?> FindInProgressByDistributionAsync(Guid distributionId, CancellationToken ct = default);
+
+    /// <summary>همه‌ی نشست‌های یک کاربر (برای محاسجه‌ی وضعیت پاسخ به نظرسنجی‌های باز).</summary>
     Task<IReadOnlyList<ResponseSessionEntity>> ListByRespondentAsync(Guid respondentUserId, CancellationToken ct = default);
 
     /// <summary>تعداد نشست‌های ارسال‌شده‌ی یک نظرسنجی (برای فاز تحلیلات).</summary>

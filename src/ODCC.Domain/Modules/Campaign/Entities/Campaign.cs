@@ -28,6 +28,16 @@ public class Campaign : BaseEntity
     /// <summary>کد نظرسنجی (برای خوانایی فهرست‌ها).</summary>
     public string SurveyCode { get; set; } = string.Empty;
 
+    /// <summary>
+    /// شناسه‌ی واحد سازمانی مالکِ کمپین (در زمان ایجاد از کاربر جاری حل می‌شود).
+    /// برای مرز سازمانی fail-closed در فهرست/مشاهده استفاده می‌شود و هرگز از
+    /// کلاینت نمی‌آید.
+    /// </summary>
+    public Guid? OrgUnitId { get; set; }
+
+    /// <summary>مسیر مادی واحد سازمانی مالک (برای فیلتر زیردرخت).</summary>
+    public string? OrgUnitPath { get; set; }
+
     /// <summary>نحوه‌ی تعیین جمعیت هدف.</summary>
     public TargetAudienceType AudienceType { get; set; } = TargetAudienceType.AllCompany;
 

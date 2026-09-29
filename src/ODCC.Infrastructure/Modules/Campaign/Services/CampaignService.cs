@@ -37,6 +37,7 @@ public sealed class CampaignService(
     IDistributionRepository distributionRepository,
     ISurveyRepository surveyRepository,
     IEmployeeRepository employeeRepository,
+    ODCC.Application.Authorization.IOrgScopeProvider orgScopeProvider,
     ICurrentUserService currentUserService,
     ICampaignUnitOfWork unitOfWork,
     CampaignDbContext dbContext) : ICampaignService
@@ -45,14 +46,18 @@ public sealed class CampaignService(
     private readonly IDistributionRepository _distributionRepository = distributionRepository;
     private readonly ISurveyRepository _surveyRepository = surveyRepository;
     private readonly IEmployeeRepository _employeeRepository = employeeRepository;
+    private readonly ODCC.Application.Authorization.IOrgScopeProvider _orgScopeProvider = orgScopeProvider;
     private readonly ICurrentUserService _currentUserService = currentUserService;
     private readonly ICampaignUnitOfWork _unitOfWork = unitOfWork;
     private readonly CampaignDbContext _dbContext = dbContext;
 
     public async Task<PagedResult<CampaignSummaryDto>> SearchAsync(CampaignSearchRequest request, CancellationToken ct = default)
     {
-        var totalCount = await _campaignRepository.CountAsync(request, ct);
-        var campaigns = await _campaignRepository.SearchAsync(request, ct);
+        // مرز سازمانی (fail-closed): دامنه‌ی کاربر جاری روی فهرست اعمال می‌شود.
+        var scope = await _orgScopeProvider.GetCurrentScopeAsync(ct);
+
+        var totalCount = await _campaignRepository.CountAsync(request, scope, ct);
+        var campaigns = await _campaignRepository.SearchAsync(request, scope, ct);
 
         // شمارش توزیع‌ها در یک پرس‌وجوی گروهی، تا فهرست نیازی به بارگذاری هر کمپین نداشته باشد.
         var distributionCounts = campaigns.Count > 0
@@ -94,6 +99,12 @@ public sealed class CampaignService(
             return Result.Failure<CampaignDto>("campaign_not_found", "کمپین یافت نشد.");
         }
 
+        // مرز سازمانی (fail-closed): پیام خطا عمداً «یافت نشد» است.
+        if (!await CanAccessCampaignAsync(campaign, ct))
+        {
+            return Result.Failure<CampaignDto>("campaign_not_found", "کمپین یافت نشد.");
+        }
+
         return Result.Success(await ToDtoAsync(campaign, ct));
     }
 
@@ -111,6 +122,13 @@ public sealed class CampaignService(
             return Result.Failure<CampaignDto>("campaign_code_taken", "این کد کمپین قبلاً استفاده شده است.");
         }
 
+        // مرز سازمانی: مالکیت کمپین در زمان ایجاد از دامنه‌ی کاربر جاری حل
+        // می‌شود و هرگز از کلاینت نمی‌آید.
+        var scope = await _orgScopeProvider.GetCurrentScopeAsync(ct);
+        var (orgUnitId, orgUnitPath) = scope.HasVisibleOrgScope
+            ? (scope.AnchorOrgUnitId, scope.AnchorPath)
+            : (null, null);
+
         var campaign = new CampaignEntity
         {
             Code = request.Code,
@@ -121,7 +139,9 @@ public sealed class CampaignService(
             IncludeInactiveEmployees = request.IncludeInactiveEmployees,
             Channel = request.Channel,
             ScheduledAt = request.ScheduledAt,
-            EndsAt = request.EndsAt
+            EndsAt = request.EndsAt,
+            OrgUnitId = orgUnitId,
+            OrgUnitPath = orgUnitPath
         };
 
         ApplyLocalizations(campaign, request.Localizations);
@@ -153,6 +173,12 @@ public sealed class CampaignService(
     {
         var campaign = await _campaignRepository.GetByIdAsync(id, ct);
         if (campaign is null)
+        {
+            return Result.Failure<CampaignDto>("campaign_not_found", "کمپین یافت نشد.");
+        }
+
+        // مرز سازمانی (fail-closed): پیام خطا عمداً «یافت نشد» است.
+        if (!await CanAccessCampaignAsync(campaign, ct))
         {
             return Result.Failure<CampaignDto>("campaign_not_found", "کمپین یافت نشد.");
         }
@@ -220,6 +246,12 @@ public sealed class CampaignService(
             return Result.Failure<CampaignDto>("campaign_not_found", "کمپین یافت نشد.");
         }
 
+        // مرز سازمانی (fail-closed): پیام خطا عمداً «یافت نشد» است.
+        if (!await CanAccessCampaignAsync(campaign, ct))
+        {
+            return Result.Failure<CampaignDto>("campaign_not_found", "کمپین یافت نشد.");
+        }
+
         if (campaign.Status != CampaignStatus.Draft)
         {
             return Result.Failure<CampaignDto>("campaign_is_not_draft", "فقط کمپین‌های پیش‌نویس قابل زمان‌بندی هستند.");
@@ -243,6 +275,12 @@ public sealed class CampaignService(
     {
         var campaign = await _campaignRepository.GetByIdAsync(id, ct);
         if (campaign is null)
+        {
+            return Result.Failure<CampaignLaunchResultDto>("campaign_not_found", "کمپین یافت نشد.");
+        }
+
+        // مرز سازمانی (fail-closed): پیام خطا عمداً «یافت نشد» است.
+        if (!await CanAccessCampaignAsync(campaign, ct))
         {
             return Result.Failure<CampaignLaunchResultDto>("campaign_not_found", "کمپین یافت نشد.");
         }
@@ -312,6 +350,12 @@ public sealed class CampaignService(
             return Result.Failure<CampaignDto>("campaign_not_found", "کمپین یافت نشد.");
         }
 
+        // مرز سازمانی (fail-closed): پیام خطا عمداً «یافت نشد» است.
+        if (!await CanAccessCampaignAsync(campaign, ct))
+        {
+            return Result.Failure<CampaignDto>("campaign_not_found", "کمپین یافت نشد.");
+        }
+
         if (campaign.Status != CampaignStatus.Running)
         {
             return Result.Failure<CampaignDto>("campaign_is_not_running", "فقط کمپین‌های «در حال اجرا» قابل تکمیل هستند.");
@@ -330,6 +374,12 @@ public sealed class CampaignService(
     {
         var campaign = await _campaignRepository.GetByIdAsync(id, ct);
         if (campaign is null)
+        {
+            return Result.Failure<CampaignDto>("campaign_not_found", "کمپین یافت نشد.");
+        }
+
+        // مرز سازمانی (fail-closed): پیام خطا عمداً «یافت نشد» است.
+        if (!await CanAccessCampaignAsync(campaign, ct))
         {
             return Result.Failure<CampaignDto>("campaign_not_found", "کمپین یافت نشد.");
         }
@@ -356,6 +406,12 @@ public sealed class CampaignService(
             return Result.Failure("campaign_not_found", "کمپین یافت نشد.");
         }
 
+        // مرز سازمانی (fail-closed): پیام خطا عمداً «یافت نشد» است.
+        if (!await CanAccessCampaignAsync(campaign, ct))
+        {
+            return Result.Failure("campaign_not_found", "کمپین یافت نشد.");
+        }
+
         // فقط پیش‌نویس‌ها حذف می‌شوند تا تاریخچه‌ی توزیع‌ها در کمپین‌های اجراشده حفظ شود.
         if (campaign.Status != CampaignStatus.Draft)
         {
@@ -375,6 +431,21 @@ public sealed class CampaignService(
         DistributionSearchRequest request,
         CancellationToken ct = default)
     {
+        var campaign = await _campaignRepository.GetByIdAsync(campaignId, ct);
+
+        // مرز سازمانی (fail-closed): توزیع‌ها شامل نام و ایمیل کارمندان است،
+        // پس فقط در صورت دسترسی به کمپین قابل مشاهده هستند.
+        if (campaign is null || !await CanAccessCampaignAsync(campaign, ct))
+        {
+            return new PagedResult<DistributionDto>
+            {
+                Items = [],
+                TotalCount = 0,
+                Page = Math.Max(request.Page, 1),
+                PageSize = Math.Clamp(request.PageSize, 1, 200)
+            };
+        }
+
         var totalCount = await _distributionRepository.CountByCampaignAsync(campaignId, ct);
         var distributions = await _distributionRepository.SearchByCampaignAsync(campaignId, request, ct);
 
@@ -518,6 +589,12 @@ public sealed class CampaignService(
             return Result.Failure("campaign_not_found", "کمپین یافت نشد.");
         }
 
+        // مرز سازمانی (fail-closed): پیام خطا عمداً «یافت نشد» است.
+        if (!await CanAccessCampaignAsync(campaign, ct))
+        {
+            return Result.Failure("campaign_not_found", "کمپین یافت نشد.");
+        }
+
         if (!campaign.CancelReminder(reminderId))
         {
             return Result.Failure("reminder_not_cancellable", "یادآور یافت نشد یا از قبل ارسال شده است.");
@@ -530,6 +607,16 @@ public sealed class CampaignService(
     }
 
     // --- کمک‌کننده‌ها ----------------------------------------------------------
+
+    /// <summary>
+    /// بررسی مرز سازمانی یک کمپین (fail-closed). کمپین‌های بدون مالک سازمانی
+    /// (قبل از این رفتار) فقط برای دامنه‌ی Company قابل‌مشاهده‌اند.
+    /// </summary>
+    private async Task<bool> CanAccessCampaignAsync(CampaignEntity campaign, CancellationToken ct)
+    {
+        var scope = await _orgScopeProvider.GetCurrentScopeAsync(ct);
+        return scope.CanAccess(campaign.OrgUnitId, campaign.OrgUnitPath);
+    }
 
     /// <summary>بارگذاری نظرسنجی در صورتی که قابل استفاده باشد (بسته/بایگانی نباشد).</summary>
     private async Task<Domain.Modules.Survey.Entities.Survey?> LoadUsableSurveyAsync(Guid surveyId, CancellationToken ct)

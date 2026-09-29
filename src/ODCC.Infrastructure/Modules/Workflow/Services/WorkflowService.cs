@@ -16,7 +16,8 @@ namespace ODCC.Infrastructure.Modules.Workflow.Services;
 /// سرویس گردش کار.
 ///
 /// <b>مجوزها:</b> مدیریت تعاریف نیازمند <c>workflows.manage</c> است (در کنترلر
-/// اعمال می‌شود). تأیید گذارها نیازمند مجوزی است که روی گذار مشخص شده؛ این
+/// اعمال می‌شود). تأیید گذارها نیازمند مجوزی است که روی گذار مشخص شده؛ اگر
+/// گذار مجوزی تعیین نکرده، مجوز <c>workflows.approve</c> کافی است. این
 /// بررسی در این سرویس اعمال می‌شود (نه در کنترلر) تا هیچ مسیری دور نزند.
 ///
 /// <b>مرز سازمانی (fail-closed):</b> نمونه‌ها و درخواست‌های تأیید فقط در صورتی
@@ -761,7 +762,7 @@ public sealed class WorkflowService(
     /// <summary>
     /// آیا کاربر جاری می‌تواند روی این درخواست تأیید تصمیم بگیرد؟
     /// اگر گذار مجوزی مشخص کرده باشد، کاربر باید آن مجوز را داشته باشد؛
-    /// در غیر این صورت هر کاربر احراز هویت‌شده با مجوز مدیریت گردش کار می‌تواند.
+    /// در غیر این صورت مجوز پیش‌فرض <c>workflows.approve</c> کافی است.
     /// </summary>
     private bool CanDecide(WorkflowApprovalRequest approval)
     {
@@ -776,8 +777,8 @@ public sealed class WorkflowService(
             return _currentUserService.HasPermission(approval.ApproverPermission);
         }
 
-        // بدون مجوز مشخص‌شده: نیاز به مجوز مدیریت گردش کار.
-        return _currentUserService.HasPermission(ODCC.Application.Authorization.Permissions.Workflows.Manage);
+        // بدون مجوز مشخص‌شده روی گذار: مجوز پیش‌فرض تأیید گردش کار کافی است.
+        return _currentUserService.HasPermission(ODCC.Application.Authorization.Permissions.Workflows.Approve);
     }
 
     /// <summary>
@@ -1020,7 +1021,7 @@ public sealed class WorkflowService(
         if (string.IsNullOrWhiteSpace(approval.ApproverPermission))
         {
             // بدون مجوز مشخص‌شده: مجوز مدیریت گردش کار لازم است.
-            return actorPermissions.Contains(ODCC.Application.Authorization.Permissions.Workflows.Manage);
+            return actorPermissions.Contains(ODCC.Application.Authorization.Permissions.Workflows.Approve);
         }
 
         return actorPermissions.Contains(approval.ApproverPermission);

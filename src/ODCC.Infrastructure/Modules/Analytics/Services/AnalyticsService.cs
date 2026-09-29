@@ -85,7 +85,7 @@ public sealed class AnalyticsService(
 
     /// <inheritdoc/>
     public async Task<Result<SurveyAnalyticsDto>> ComputeAsync(
-        ComputeAnalyticsRequest request, CancellationToken ct = default)
+        ComputeAnalyticsRequest request, Guid? actorUserId = null, CancellationToken ct = default)
     {
         var survey = await _surveyRepository.GetByIdAsync(request.SurveyId, ct);
         if (survey is null)
@@ -155,7 +155,7 @@ public sealed class AnalyticsService(
             snapshot.NpsScore,
             snapshot.CsatScore,
             snapshot.CesScore,
-            _currentUserService.UserId));
+            actorUserId));
 
         await _unitOfWork.SaveChangesAsync(ct);
 
@@ -544,12 +544,14 @@ public sealed class AnalyticsService(
         if (surveyIds.Count == 0)
             return [];
 
+        // دامنه‌ی سازمانی اینجا توسط surveyIds قابل‌مشاهده محدود می‌شود (این
+        // مسیر فقط برای کمپین‌های همون نظرسنجی‌هاست)، پس فیلتر اضافی لازم نیست.
         var campaigns = await _campaignRepository.SearchAsync(new CampaignSearchRequest
         {
             IncludeArchived = false,
             Page = 1,
             PageSize = 200
-        }, ct);
+        }, scope: null, ct);
 
         return campaigns
             .Where(c => surveyIds.Contains(c.SurveyId))

@@ -683,4 +683,306 @@ public class ReportingServiceTests
         entries.Should().Contain(e => e.Action == "create" && e.EntityType == "report_definition");
         entries.Should().Contain(e => e.Action == "export" && e.EntityType == "report_execution");
     }
+
+    // --- مرز سازمانی (fail-closed) --------------------------------------------
+
+    /// <summary>
+    /// ساختن گزارشی متعلق به زیردرخت /hq/ops/it، یعنی خارج از دامنه‌ی
+    /// /hq/fin/ap که در آزمون‌ها به کاربر محدود می‌شود. کاربر جاری در پایان
+    /// دامنه‌ی Company روی همان واحد است.
+    /// </summary>
+    /// <returns>(شناسه‌ی گزارش، شناسه‌ی واحد /hq/fin/ap)</returns>
+    private static async Task<(Guid reportId, Guid visibleUnitId)> SeedReportOutsideScopeAsync(
+        TestEnvironment env)
+    {
+        var surveyId = await SeedSurveyAsync(env);
+        var ids = await env.SeedOrgHierarchyAsync();
+
+        env.SetCurrentUser(ids.otherDepartmentId, DataScope.Company);
+        var service = env.Services.GetRequiredService<IReportingService>();
+
+        var created = await service.CreateAsync(new SaveReportRequest
+        {
+            Name = "گزارش واحد دیگر",
+            Type = ReportType.SurveyAnalytics,
+            SurveyId = surveyId,
+            OrgUnitId = ids.otherDepartmentId
+        });
+
+        created.IsSuccess.Should().BeTrue();
+        created.Value!.OrgUnitPath.Should().Be("/hq/ops/it");
+
+        return (created.Value.Id, ids.departmentId);
+    }
+
+    [Fact]
+    public async Task Department_Scope_GetById_Denies_Report_Outside_Scope()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        var (reportId, visibleUnitId) = await SeedReportOutsideScopeAsync(env);
+        env.SetCurrentUser(visibleUnitId, DataScope.Department);
+
+        var service = env.Services.GetRequiredService<IReportingService>();
+
+        var result = await service.GetByIdAsync(reportId);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("report_not_found");
+    }
+
+    [Fact]
+    public async Task Department_Scope_Search_Excludes_Out_Of_Scope_Reports()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        var (_, visibleUnitId) = await SeedReportOutsideScopeAsync(env);
+        env.SetCurrentUser(visibleUnitId, DataScope.Department);
+
+        var service = env.Services.GetRequiredService<IReportingService>();
+
+        var result = await service.SearchAsync(new ReportSearchRequest { PageSize = 50 });
+
+        result.TotalCount.Should().Be(0);
+        result.Items.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Department_Scope_SearchExecutions_Excludes_Out_Of_Scope_Reports()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        var (reportId, visibleUnitId) = await SeedReportOutsideScopeAsync(env);
+
+        env.ReportingDbContext.ReportExecutions.Add(new ReportExecution
+        {
+            ReportDefinitionId = reportId,
+            ReportName = "گزارش واحد دیگر",
+            Status = ReportExecutionStatus.Succeeded
+        });
+        await env.ReportingDbContext.SaveChangesAsync();
+
+        env.SetCurrentUser(visibleUnitId, DataScope.Department);
+
+        var service = env.Services.GetRequiredService<IReportingService>();
+
+        var result = await service.SearchExecutionsAsync(new ExecutionSearchRequest { PageSize = 50 });
+
+        result.TotalCount.Should().Be(0);
+        result.Items.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Department_Scope_GetExecution_Denies_Outside_Scope()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        var (reportId, visibleUnitId) = await SeedReportOutsideScopeAsync(env);
+
+        env.ReportingDbContext.ReportExecutions.Add(new ReportExecution
+        {
+            ReportDefinitionId = reportId,
+            ReportName = "گزارش واحد دیگر",
+            Status = ReportExecutionStatus.Succeeded
+        });
+        await env.ReportingDbContext.SaveChangesAsync();
+
+        var executionId = (await env.ReportingDbContext.ReportExecutions.FirstAsync()).Id;
+
+        env.SetCurrentUser(visibleUnitId, DataScope.Department);
+
+        var service = env.Services.GetRequiredService<IReportingService>();
+
+        var result = await service.GetExecutionAsync(executionId);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("execution_not_found");
+    }
+
+    [Fact]
+    public async Task Department_Scope_GetArtifact_Denies_Outside_Scope()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        var (reportId, visibleUnitId) = await SeedReportOutsideScopeAsync(env);
+
+        env.ReportingDbContext.ReportExecutions.Add(new ReportExecution
+        {
+            ReportDefinitionId = reportId,
+            ReportName = "گزارش واحد دیگر",
+            Status = ReportExecutionStatus.Succeeded,
+            FilePath = "2026-01/report.pdf",
+            FileName = "report.pdf"
+        });
+        await env.ReportingDbContext.SaveChangesAsync();
+
+        var executionId = (await env.ReportingDbContext.ReportExecutions.FirstAsync()).Id;
+
+        env.SetCurrentUser(visibleUnitId, DataScope.Department);
+
+        var service = env.Services.GetRequiredService<IReportingService>();
+
+        var result = await service.GetArtifactAsync(executionId);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("execution_not_found");
+    }
+
+    [Fact]
+    public async Task Department_Scope_Execute_Denies_Outside_Scope()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        var (reportId, visibleUnitId) = await SeedReportOutsideScopeAsync(env);
+        env.SetCurrentUser(visibleUnitId, DataScope.Department);
+
+        var service = env.Services.GetRequiredService<IReportingService>();
+
+        var result = await service.ExecuteAsync(reportId);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("report_not_found");
+
+        // هیچ ردیف اجرایی نباید ساخته شده باشد.
+        (await env.ReportingDbContext.ReportExecutions.AnyAsync()).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Department_Scope_Update_Denies_Outside_Scope()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        var (reportId, visibleUnitId) = await SeedReportOutsideScopeAsync(env);
+        env.SetCurrentUser(visibleUnitId, DataScope.Department);
+
+        var service = env.Services.GetRequiredService<IReportingService>();
+
+        var result = await service.UpdateAsync(reportId, new SaveReportRequest
+        {
+            Name = "تغییر نام غیرمجاز",
+            Type = ReportType.SurveyAnalytics
+        });
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("report_not_found");
+
+        var row = await env.ReportingDbContext.ReportDefinitions.SingleAsync();
+        row.Name.Should().Be("گزارش واحد دیگر");
+    }
+
+    [Fact]
+    public async Task Department_Scope_Activate_And_Archive_Deny_Outside_Scope()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        var (reportId, visibleUnitId) = await SeedReportOutsideScopeAsync(env);
+        env.SetCurrentUser(visibleUnitId, DataScope.Department);
+
+        var service = env.Services.GetRequiredService<IReportingService>();
+
+        (await service.ActivateAsync(reportId)).Error.Code.Should().Be("report_not_found");
+        (await service.ArchiveAsync(reportId)).Error.Code.Should().Be("report_not_found");
+
+        var row = await env.ReportingDbContext.ReportDefinitions.SingleAsync();
+        // وضعیت کاملاً دست‌نخورده باقی مانده است (اینجا Active است چون با
+        // ActivateImmediately ساخته شده).
+        row.Status.Should().Be(ReportStatus.Active);
+    }
+
+    [Fact]
+    public async Task Create_With_OrgUnit_Outside_Scope_Is_Denied()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        env.SetCurrentUser(orgUnitId: null, DataScope.Company);
+        var surveyId = await SeedSurveyAsync(env);
+        var ids = await env.SeedOrgHierarchyAsync();
+
+        env.SetCurrentUser(ids.departmentId, DataScope.Department);
+        var service = env.Services.GetRequiredService<IReportingService>();
+
+        var result = await service.CreateAsync(new SaveReportRequest
+        {
+            Name = "گزارش متخلف",
+            Type = ReportType.SurveyAnalytics,
+            SurveyId = surveyId,
+            OrgUnitId = ids.otherDepartmentId
+        });
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("access_denied");
+        (await env.ReportingDbContext.ReportDefinitions.AnyAsync()).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Create_Without_OrgUnit_Falls_Back_To_Anchor()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        env.SetCurrentUser(orgUnitId: null, DataScope.Company);
+        var surveyId = await SeedSurveyAsync(env);
+        var ids = await env.SeedOrgHierarchyAsync();
+
+        env.SetCurrentUser(ids.departmentId, DataScope.Department);
+        var service = env.Services.GetRequiredService<IReportingService>();
+
+        var result = await service.CreateAsync(new SaveReportRequest
+        {
+            Name = "گزارش دامنه",
+            Type = ReportType.SurveyAnalytics,
+            SurveyId = surveyId
+        });
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.OrgUnitId.Should().Be(ids.departmentId);
+        result.Value.OrgUnitPath.Should().Be("/hq/fin/ap");
+    }
+
+    [Fact]
+    public async Task Update_With_OrgUnit_Outside_Scope_Is_Denied()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        env.SetCurrentUser(orgUnitId: null, DataScope.Company);
+        var surveyId = await SeedSurveyAsync(env);
+        var ids = await env.SeedOrgHierarchyAsync();
+
+        env.SetCurrentUser(ids.departmentId, DataScope.Department);
+        var service = env.Services.GetRequiredService<IReportingService>();
+
+        var created = await service.CreateAsync(new SaveReportRequest
+        {
+            Name = "گزارش دامنه",
+            Type = ReportType.SurveyAnalytics,
+            SurveyId = surveyId
+        });
+        created.IsSuccess.Should().BeTrue();
+
+        var result = await service.UpdateAsync(created.Value!.Id, new SaveReportRequest
+        {
+            Name = "گزارش دامنه",
+            Type = ReportType.SurveyAnalytics,
+            SurveyId = surveyId,
+            OrgUnitId = ids.otherDepartmentId
+        });
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("access_denied");
+
+        var row = await env.ReportingDbContext.ReportDefinitions.SingleAsync();
+        row.OrgUnitPath.Should().Be("/hq/fin/ap");
+    }
+
+    [Fact]
+    public async Task Department_Scope_Allows_Report_Inside_Scope()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        env.SetCurrentUser(orgUnitId: null, DataScope.Company);
+        var surveyId = await SeedSurveyAsync(env);
+        var ids = await env.SeedOrgHierarchyAsync();
+
+        env.SetCurrentUser(ids.departmentId, DataScope.Department);
+        var service = env.Services.GetRequiredService<IReportingService>();
+
+        var created = await service.CreateAsync(new SaveReportRequest
+        {
+            Name = "گزارش داخل دامنه",
+            Type = ReportType.SurveyAnalytics,
+            SurveyId = surveyId
+        });
+
+        var fetched = await service.GetByIdAsync(created.Value!.Id);
+
+        fetched.IsSuccess.Should().BeTrue();
+        fetched.Value!.Name.Should().Be("گزارش داخل دامنه");
+    }
 }
