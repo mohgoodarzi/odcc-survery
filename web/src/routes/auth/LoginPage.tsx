@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useLocation, useNavigate, type Location } from 'react-router-dom';
-import { LogIn, ShieldCheck } from 'lucide-react';
+import { LogIn } from 'lucide-react';
 
 import { useAuth } from '@/auth/AuthProvider';
 import { useLanguage } from '@/i18n/LanguageProvider';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
+import { Logo } from '@/components/ui/logo';
 import { ApiError } from '@/api/client';
 import { FullPageSpinner } from '@/components/ui/spinner';
 
@@ -82,9 +83,7 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          <div className="flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <ShieldCheck className="size-6" />
-          </div>
+          <Logo className="size-14" />
           <div>
             <h1 className="text-xl font-bold">{t.app.name}</h1>
             <p className="text-sm text-muted-foreground">{t.auth.welcomeBack}</p>

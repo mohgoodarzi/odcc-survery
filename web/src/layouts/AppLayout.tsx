@@ -13,6 +13,7 @@ import { useLanguage } from '@/i18n/LanguageProvider';
 import { useClickOutside } from '@/lib/use-click-outside';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Logo } from '@/components/ui/logo';
 
 interface NavItem {
   to: string;
@@ -204,10 +205,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground lg:flex-row">
       <aside className="hidden w-64 shrink-0 flex-col border-e bg-card lg:flex">
-        <div className="flex h-16 items-center gap-2 border-b px-6">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <ShieldCheck className="size-4" />
-          </div>
+        <div className="flex h-16 items-center gap-2.5 border-b px-6">
+          <Logo className="size-9" />
           <span className="font-semibold">{t.app.name}</span>
         </div>
 
@@ -216,10 +215,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       <div className="flex flex-1 flex-col">
         <header className="flex h-16 items-center justify-end gap-4 border-b px-4 sm:px-6">
-          <div className="me-auto flex items-center gap-2 lg:hidden">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <ShieldCheck className="size-4" />
-            </div>
+          <div className="me-auto flex items-center gap-2.5 lg:hidden">
+            <Logo className="size-9" />
             <span className="font-semibold">{t.app.name}</span>
           </div>
 
