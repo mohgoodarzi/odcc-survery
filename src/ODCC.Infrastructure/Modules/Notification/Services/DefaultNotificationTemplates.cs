@@ -44,7 +44,7 @@ internal static class DefaultNotificationTemplates
             {
                 [Language.Fa] = (
                     "نظرسنجی «{{survey_title}}» بسته شد",
-                    "نظرسنجی «{{survey_title}}» به‌طور رسمی بسته شد و دیگر پاسخ‌گویی نمی‌پذیرد. نتایج تجمیعی به‌زودی در بخش تحلیلات در دسترس است."),
+                    "نظرسنجی «{{survey_title}}» به‌طور رسمی بسته شد و دیگر پاسخ‌گویی نمی‌پذیرد. نتایج تجمیعی به‌زودی در بخش تحلیل ها در دسترس است."),
                 [Language.En] = (
                     "Survey \"{{survey_title}}\" is closed",
                     "The survey \"{{survey_title}}\" has been officially closed and no longer accepts responses. Aggregate results will soon be available in the analytics section.")
@@ -64,7 +64,7 @@ internal static class DefaultNotificationTemplates
             {
                 [Language.Fa] = (
                     "هشدار: افت شاخص در نظرسنجی «{{survey_title}}»",
-                    "شاخص «{{metric_name}}» در نظرسنجی «{{survey_title}}» به {{metric_value}} رسیده است که از آستانه‌ی هشدار ({{threshold}}) پایین‌تر است.\n\nتوصیه می‌شود نتایج را در بخش تحلیلات بررسی کنید.\n\nتوجه: این هشدار فقط بر اساس داده‌های تجمیعی است و هیچ پاسخ‌دهنده‌ای شناسایی نمی‌شود."),
+                    "شاخص «{{metric_name}}» در نظرسنجی «{{survey_title}}» به {{metric_value}} رسیده است که از آستانه‌ی هشدار ({{threshold}}) پایین‌تر است.\n\nتوصیه می‌شود نتایج را در بخش تحلیل ها بررسی کنید.\n\nتوجه: این هشدار فقط بر اساس داده‌های تجمیعی است و هیچ پاسخ‌دهنده‌ای شناسایی نمی‌شود."),
                 [Language.En] = (
                     "Alert: metric drop in survey \"{{survey_title}}\"",
                     "The \"{{metric_name}}\" metric for survey \"{{survey_title}}\" reached {{metric_value}}, below the alert threshold ({{threshold}}).\n\nWe recommend reviewing the results in the analytics section.\n\nNote: this alert is based on aggregate data only; no respondent is identified.")

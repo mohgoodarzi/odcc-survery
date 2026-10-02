@@ -3,7 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { rolesApi } from '@/api/roles';
 import { usersApi } from '@/api/users';
 import { employeesApi, EmployeeStatus, orgUnitsApi, positionsApi } from '@/api/organization';
-import { questionnairesApi, QuestionnaireStatus } from '@/api/questionnaires';
+import { questionsApi, QuestionType, type QuestionSearchRequest } from '@/api/questionBank';
+import {
+  questionnairesApi,
+  QuestionnaireStatus,
+  type SaveQuestionnaireRequest
+} from '@/api/questionnaires';
 import {
   surveyTemplatesApi,
   surveysApi,
@@ -49,6 +54,11 @@ export const queryKeys = {
   employee: (id: string | null) => ['employees', 'detail', id] as const,
   managerOptions: ['employees', 'manager-options'] as const,
   questionnaires: ['questionnaires'] as const,
+  questionnaireSearch: (searchText: string | null, status: number | null, page: number) =>
+    ['questionnaires', 'search', searchText, status, page] as const,
+  questionnaire: (id: string | null) => ['questionnaires', 'detail', id] as const,
+  questionBankSearch: (searchText: string | null, type: number | null, page: number) =>
+    ['question-bank', 'search', searchText, type, page] as const,
   surveySearch: (
     searchText: string | null,
     status: number | null,
@@ -370,9 +380,24 @@ export function useDeleteEmployee() {
   });
 }
 
+export function useImportEmployees() {
+  const { culture } = useLanguage();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (file: File) => employeesApi.import(culture, file),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['employees'] });
+    }
+  });
+}
+
 /**
  * پرسشنامه‌های قابل‌استفاده برای انتخاب در فرم نظرسنجی.
  * فقط پرسشنامه‌های منتشرشده معتبر هستند چون نظرسنجی به یک نسخه‌ی مشخص وصل می‌شود.
+ *
+ * توجه: اندازه‌ی صفحه باید با سقف اعتبارسنجی سمت سرور (۱۰۰) هم‌خوان باشد؛
+ * در غیر این صورت درخواست با خطای ۴۰۰ رد می‌شود و فهرست خالی می‌ماند.
  */
 export function useQuestionnaires() {
   const { culture } = useLanguage();
@@ -382,19 +407,171 @@ export function useQuestionnaires() {
     queryFn: ({ signal }) =>
       questionnairesApi.search(
         culture,
-        { status: QuestionnaireStatus.Published, page: 1, pageSize: 200 },
+        { status: QuestionnaireStatus.Published, page: 1, pageSize: 100 },
         signal
       )
   });
 }
 
-export function useSurveysSearch(params: {
+/**
+ * جستجوی صفحه‌بندی‌شده‌ی پرسشنامه‌ها با فیلتر وضعیت — برای صفحه‌ی مدیریت.
+ */
+export function useQuestionnairesSearch(params: {
   searchText: string | null;
   status: number | null;
-  questionnaireId: string | null;
-  includeArchived: boolean;
   page: number;
 }) {
+  const { culture } = useLanguage();
+
+  return useQuery({
+    queryKey: queryKeys.questionnaireSearch(params.searchText, params.status, params.page),
+    queryFn: ({ signal }) =>
+      questionnairesApi.search(
+        culture,
+        {
+          searchText: params.searchText,
+          status: params.status as QuestionnaireStatus | null,
+          page: params.page,
+          pageSize: 20
+        },
+        signal
+      )
+  });
+}
+
+export function useQuestionnaire(id: string | null) {
+  const { culture } = useLanguage();
+
+  return useQuery({
+    queryKey: queryKeys.questionnaire(id),
+    queryFn: ({ signal }) => questionnairesApi.getById(culture, id as string, signal),
+    enabled: !!id
+  });
+}
+
+/**
+ * جستجوی سؤال‌های کتابخانه برای انتخاب آیتم‌های پرسشنامه در فرم مدیریت.
+ * سؤال‌های بایگانی‌شده به‌طور پیش‌فرض نشان داده نمی‌شوند.
+ */
+export function useQuestionBankSearch(params: {
+  searchText: string | null;
+  type: number | null;
+  page?: number;
+  enabled?: boolean;
+}) {
+  const { culture } = useLanguage();
+
+  return useQuery({
+    queryKey: queryKeys.questionBankSearch(params.searchText, params.type, params.page ?? 1),
+    queryFn: ({ signal }) =>
+      questionsApi.search(
+        culture,
+        {
+          searchText: params.searchText,
+          type: params.type as QuestionType | null,
+          includeArchived: false,
+          page: params.page ?? 1,
+          pageSize: 100
+        } satisfies QuestionSearchRequest,
+        signal
+      ),
+    enabled: params.enabled ?? true
+  });
+}
+
+function useInvalidateQuestionnaires() {
+  const queryClient = useQueryClient();
+
+  // invalidation با پیشوند «questionnaires» هم فهرست مدیریت، هم جزئیات و هم
+  // گزینه‌های انتخاب نظرسنجی را پوشش می‌دهد.
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.questionnaires });
+  };
+}
+
+/**
+ * ایجاد سؤال جدید در کتابخانه‌ی سؤالات — از داخل بخش مدیریت پرسشنامه.
+ * پس از ایجاد، فهرست سؤال‌های قابل انتخاب بازخوانی می‌شود.
+ */
+export function useCreateQuestion() {
+  const { culture } = useLanguage();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: questionsApi.create.bind(null, culture),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['question-bank'] });
+    }
+  });
+}
+
+export function useCreateQuestionnaire() {
+  const { culture } = useLanguage();
+  const invalidate = useInvalidateQuestionnaires();
+
+  return useMutation({
+    mutationFn: questionnairesApi.create.bind(null, culture),
+    onSuccess: () => invalidate()
+  });
+}
+
+export function useUpdateQuestionnaire() {
+  const { culture } = useLanguage();
+  const invalidate = useInvalidateQuestionnaires();
+
+  return useMutation({
+    mutationFn: ({ id, request }: { id: string; request: SaveQuestionnaireRequest }) =>
+      questionnairesApi.update(culture, id, request),
+    onSuccess: () => invalidate()
+  });
+}
+
+export function useDeleteQuestionnaire() {
+  const { culture } = useLanguage();
+  const invalidate = useInvalidateQuestionnaires();
+
+  return useMutation({
+    mutationFn: questionnairesApi.delete.bind(null, culture),
+    onSuccess: () => invalidate()
+  });
+}
+
+/**
+ * انتشار (فعال‌سازی) پرسشنامه — پس از آن در فرم نظرسنجی قابل انتخاب می‌شود.
+ */
+export function usePublishQuestionnaire() {
+  const { culture } = useLanguage();
+  const invalidate = useInvalidateQuestionnaires();
+
+  return useMutation({
+    mutationFn: questionnairesApi.publish.bind(null, culture),
+    onSuccess: () => invalidate()
+  });
+}
+
+/**
+ * بایگانی (غیرفعال‌سازی) پرسشنامه — دیگر در فرم نظرسنجی قابل انتخاب نیست.
+ */
+export function useArchiveQuestionnaire() {
+  const { culture } = useLanguage();
+  const invalidate = useInvalidateQuestionnaires();
+
+  return useMutation({
+    mutationFn: questionnairesApi.archive.bind(null, culture),
+    onSuccess: () => invalidate()
+  });
+}
+
+export function useSurveysSearch(
+  params: {
+    searchText: string | null;
+    status: number | null;
+    questionnaireId: string | null;
+    includeArchived: boolean;
+    page: number;
+  },
+  enabled = true
+) {
   const { culture } = useLanguage();
 
   return useQuery({
@@ -417,7 +594,8 @@ export function useSurveysSearch(params: {
           pageSize: 20
         },
         signal
-      )
+      ),
+    enabled
   });
 }
 
@@ -595,6 +773,9 @@ export function useArchiveSurveyTemplate() {
  * نظرسنجی‌هایی که می‌توانند در یک کمپین توزیع شوند: هر چیزی به جز بسته/بایگانی‌شده.
  * بر اساس سرویس سمت سرور، فقط نظرسنجی‌های فعال قابل اجرا هستند، اما در زمان
  * ساخت کمپین هنوز انتشار نیازمند نیست تا گردش کار قفل نشود.
+ *
+ * توجه: سقف اندازه‌ی صفحه سمت سرور ۱۰۰ است؛ مقدار بالاتر با خطای ۴۰۰ رد می‌شود
+ * و فهرست نظرسنجی‌های قابل انتخاب خالی می‌ماند.
  */
 export function useCampaignableSurveys() {
   const { culture } = useLanguage();
@@ -608,7 +789,7 @@ export function useCampaignableSurveys() {
           status: null,
           includeArchived: false,
           page: 1,
-          pageSize: 200
+          pageSize: 100
         },
         signal
       ),

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using ODCC.Api.Authorization;
+using ODCC.Application.Abstractions;
 using ODCC.Application.Authorization;
 using ODCC.Application.Modules.Organization.Abstractions;
 using ODCC.Application.Modules.Organization.Dtos;
@@ -23,8 +24,8 @@ public sealed class EmployeesController(IEmployeeService employeeService) : Cont
     /// </summary>
     [HttpGet]
     [HasPermission(Permissions.Organization.EmployeesView)]
-    [ProducesResponseType(typeof(IReadOnlyList<EmployeeSummaryDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<EmployeeSummaryDto>>> Search(
+    [ProducesResponseType(typeof(PagedResult<EmployeeSummaryDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<PagedResult<EmployeeSummaryDto>>> Search(
         [FromQuery] string? searchText,
         [FromQuery] Guid? orgUnitId,
         [FromQuery] bool includeDescendants = false,
@@ -118,6 +119,62 @@ public sealed class EmployeesController(IEmployeeService employeeService) : Cont
         }
 
         return CreatedAtAction(nameof(GetById), new { id = result.GetValueOrThrow().Id, culture = RouteData.Values["culture"] }, result.GetValueOrThrow());
+    }
+
+    /// <summary>
+    /// ورود گروهی کارمندان از یک فایل اکسل (.xlsx).
+    ///
+    /// ردیف‌های معتبر ایجاد می‌شوند، ردیف‌های دارای کد پرسنلی تکراری نادیده گرفته
+    /// می‌شوند و ردیف‌های نامعتبر در پاسخ گزارش می‌شوند. هیچ جدول یا مدل جدیدی
+    /// ساخته نمی‌شود — همه‌ی ردیف‌ها از طریق همان مسیر ایجاد کارمند پردازش می‌شوند.
+    /// </summary>
+    [HttpPost("import")]
+    [HasPermission(Permissions.Organization.EmployeesManage)]
+    [RequestSizeLimit(25 * 1024 * 1024)]
+    [ProducesResponseType(typeof(EmployeeImportResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<EmployeeImportResultDto>> Import(
+        [FromForm] IFormFile? file,
+        CancellationToken ct)
+    {
+        if (file is null || file.Length == 0)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "فایل نامعتبر",
+                Status = StatusCodes.Status400BadRequest,
+                Detail = "فایلی برای ورود اطلاعات ارسال نشده است.",
+                Extensions = { ["code"] = "import_invalid_file" }
+            });
+        }
+
+        var extension = Path.GetExtension(file.FileName);
+        if (!extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "فرمت فایل پشتیبانی نمی‌شود",
+                Status = StatusCodes.Status400BadRequest,
+                Detail = "فقط فایل‌های اکسل با پسوند .xlsx پشتیبانی می‌شوند.",
+                Extensions = { ["code"] = "import_invalid_file" }
+            });
+        }
+
+        await using var stream = file.OpenReadStream();
+        var result = await _employeeService.ImportAsync(stream, ct);
+
+        if (result.IsFailure)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "ورود اطلاعات ناموفق بود",
+                Status = StatusCodes.Status400BadRequest,
+                Detail = result.Error.Message,
+                Extensions = { ["code"] = result.Error.Code }
+            });
+        }
+
+        return Ok(result.Value);
     }
 
     /// <summary>ویرایش کارمند.</summary>

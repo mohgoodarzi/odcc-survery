@@ -219,6 +219,45 @@ public sealed class ReportsController(IReportingService reportingService) : Cont
         return Ok(result);
     }
 
+    /// <summary>
+    /// دریافت داده‌ی نمایش‌گرای یک تعریف گزارش (بخش‌ها، ستون‌ها و ردیف‌ها).
+    /// این همان داده‌ای است که فایل خروجی از آن رندر می‌شود، برای نمایش
+    /// به‌صورت جدول روی صفحه.
+    /// </summary>
+    [HttpGet("{id:guid}/data")]
+    [HasPermission(Permissions.Reports.View)]
+    [ProducesResponseType(typeof(ReportDataBundleDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<ReportDataBundleDto>> GetData(Guid id, CancellationToken ct)
+    {
+        var result = await _reportingService.GetDataAsync(id, ct);
+
+        if (result.IsFailure)
+        {
+            if (result.Error.Code is "report_not_found")
+            {
+                return NotFound(new ProblemDetails
+                {
+                    Title = "گزارش یافت نشد",
+                    Status = StatusCodes.Status404NotFound,
+                    Detail = result.Error.Message,
+                    Extensions = { ["code"] = result.Error.Code }
+                });
+            }
+
+            return BadRequest(new ProblemDetails
+            {
+                Title = "داده‌ی گزارش در دسترس نیست",
+                Status = StatusCodes.Status400BadRequest,
+                Detail = result.Error.Message,
+                Extensions = { ["code"] = result.Error.Code }
+            });
+        }
+
+        return Ok(result.Value);
+    }
+
     /// <summary>دریافت یک اجرا با شناسه.</summary>
     [HttpGet("executions/{executionId:guid}")]
     [HasPermission(Permissions.Reports.View)]

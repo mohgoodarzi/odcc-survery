@@ -176,6 +176,7 @@ export function SurveyTemplateDialog({ open, onClose, templateId }: SurveyTempla
           htmlFor="templateQuestionnaire"
           required
           error={errors.questionnaireId}
+          hint={questionnaireOptions.length === 0 ? t.surveys.noActiveQuestionnaires : undefined}
         >
           <Select
             id="templateQuestionnaire"

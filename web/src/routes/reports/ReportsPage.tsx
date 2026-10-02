@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileBarChart, Plus, Pencil, Search, Play, Archive, Clock, Activity } from 'lucide-react';
+import { FileBarChart, Plus, Pencil, Search, Play, Archive, Clock, Activity, Table2 } from 'lucide-react';
 
 import { ApiError } from '@/api/client';
 import {
@@ -34,6 +34,7 @@ import { formatDateTime } from '@/i18n/format';
 import type { Dictionary } from '@/i18n/types';
 import { ReportDialog } from './ReportDialog';
 import { ReportExecutionsDialog } from './ReportExecutionsDialog';
+import { ReportResults } from './ReportResults';
 
 /**
  * صفحه‌ی مدیریت گزارش‌ها: فهرست صفحه‌بندی‌شده‌ی تعاریف با فیلتر بر اساس
@@ -56,6 +57,7 @@ export function ReportsPage() {
   const [activateTarget, setActivateTarget] = useState<string | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<string | null>(null);
   const [executeTarget, setExecuteTarget] = useState<string | null>(null);
+  const [resultsFor, setResultsFor] = useState<ReportDefinition | null>(null);
 
   const { data, isLoading, isError, error, refetch } = useReportSearch({
     searchText,
@@ -224,6 +226,16 @@ export function ReportsPage() {
                         <Clock className="size-4" />
                       </Button>
 
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setResultsFor(report)}
+                        aria-label={t.reports.showResults}
+                        title={t.reports.showResults}
+                      >
+                        <Table2 className="size-4" />
+                      </Button>
+
                       {canManage && (
                         <>
                           <Button
@@ -290,6 +302,10 @@ export function ReportsPage() {
         <Activity className="size-4" />
         {t.reports.privacyNote}
       </p>
+
+      {resultsFor && (
+        <ReportResults report={resultsFor} onClose={() => setResultsFor(null)} />
+      )}
 
       {createOpen && <ReportDialog open={createOpen} onClose={() => setCreateOpen(false)} />}
 
@@ -363,7 +379,16 @@ export function ReportsPage() {
         }
         onConfirm={() => {
           if (!executeTarget) return;
-          executeMutation.mutate(executeTarget, { onSuccess: () => setExecuteTarget(null) });
+          executeMutation.mutate(executeTarget, {
+            onSuccess: (execution) => {
+              setExecuteTarget(null);
+              // پس از اجرای موفق، نتایج همان گزارش زیر فهرست نمایش داده می‌شود.
+              const executed = reports.find((report) => report.id === execution.reportDefinitionId);
+              if (executed) {
+                setResultsFor(executed);
+              }
+            }
+          });
         }}
       />
     </AppLayout>

@@ -29,10 +29,12 @@ import { EmptyState, ErrorState, TableLoading } from '@/components/ui/states';
 import { Pagination } from '@/routes/identity/UsersPage';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Dialog } from '@/components/ui/dialog';
+import { DateTimePicker } from '@/components/ui/date-picker';
 import { FormField } from '@/components/ui/form-field';
 import { formatDateTime } from '@/i18n/format';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Dictionary } from '@/i18n/types';
+import { localDateTimeToIso } from '@/lib/datetime';
 import { CampaignDialog } from './CampaignDialog';
 import { CampaignDistributionsDialog } from './CampaignDistributionsDialog';
 
@@ -546,8 +548,7 @@ function ScheduleDialog({ campaignId, isPending, error, onConfirm, onClose }: Sc
     event.preventDefault();
     if (!scheduledAt) return;
 
-    const iso = new Date(scheduledAt).toISOString();
-    onConfirm(iso);
+    onConfirm(localDateTimeToIso(scheduledAt) ?? scheduledAt);
   }
 
   return (
@@ -579,13 +580,11 @@ function ScheduleDialog({ campaignId, isPending, error, onConfirm, onClose }: Sc
         )}
 
         <FormField label={t.campaigns.scheduledAt} htmlFor="campaignScheduleAt" required>
-          <Input
+          <DateTimePicker
             id="campaignScheduleAt"
-            type="datetime-local"
             value={scheduledAt}
-            onChange={(event) => setScheduledAt(event.target.value)}
+            onChange={setScheduledAt}
             disabled={isPending}
-            dir="ltr"
           />
         </FormField>
 

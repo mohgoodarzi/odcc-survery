@@ -389,6 +389,28 @@ public sealed class ReportingService(
     }
 
     /// <inheritdoc/>
+    public async Task<Result<ReportDataBundleDto>> GetDataAsync(Guid reportDefinitionId, CancellationToken ct = default)
+    {
+        // مرز سازمانی (fail-closed): داده‌ی گزارش فقط در صورت دسترسی به تعریفِ
+        // آن قابل مشاهده است. مسیر سازمانی از تعریف خوانده می‌شود، نه کلاینت.
+        var definition = await LoadAccessibleDefinitionAsync(reportDefinitionId, ct);
+        if (definition.IsFailure)
+        {
+            return Result.Failure<ReportDataBundleDto>(definition.Error);
+        }
+
+        // همان مسیر جمع‌آوری داده‌ای که رندر فایل خروجی استفاده می‌کند؛
+        // بنابراین جدول روی صفحه با فایل قابل‌دانلود یکسان است.
+        var bundle = await _dataAssembler.AssembleAsync(definition.Value!, ct);
+        if (bundle.IsFailure)
+        {
+            return Result.Failure<ReportDataBundleDto>(bundle.Error);
+        }
+
+        return Result.Success(ToBundleDto(bundle.Value!));
+    }
+
+    /// <inheritdoc/>
     public async Task<int> ProcessDueReportsAsync(DateTime asOf, CancellationToken ct = default)
     {
         var due = await _definitionRepository.ListDueAsync(asOf, ct);
@@ -669,6 +691,30 @@ public sealed class ReportingService(
         CreatedAt = definition.CreatedAt,
         UpdatedAt = definition.UpdatedAt,
         LastSuccessAt = lastSuccess?.CompletedAt
+    };
+
+    /// <summary>
+    /// تبدیل بسته‌ی داده‌ی نمایش‌گرا به DTO. این همان داده‌ای است که رندر
+    /// فایل خروجی از آن ساخته می‌شود، پس جدول روی صفحه با فایل یکسان است.
+    /// </summary>
+    private static ReportDataBundleDto ToBundleDto(ReportDataBundle bundle) => new()
+    {
+        Title = bundle.Title,
+        Subtitle = bundle.Subtitle,
+        Type = bundle.Type,
+        GeneratedAt = bundle.GeneratedAt,
+        GeneratedBy = bundle.GeneratedBy,
+        Sections = bundle.Sections.Select(ToSectionDto).ToList()
+    };
+
+    private static ReportSectionDto ToSectionDto(ReportSection section) => new()
+    {
+        Title = section.Title,
+        Columns = section.Columns
+            .Select(column => new ReportColumnDto(column.Title, column.ColumnType))
+            .ToList(),
+        Rows = section.Rows.Select(row => row.ToList()).ToList(),
+        Footnote = section.Footnote
     };
 
     private static ReportExecutionDto ToExecutionDto(ReportExecution execution) => new()

@@ -27,6 +27,7 @@ export interface Dictionary {
   nav: {
     dashboard: string;
     surveys: string;
+    questionnaires: string;
     campaigns: string;
     analytics: string;
     reports: string;
@@ -56,6 +57,12 @@ export interface Dictionary {
     profile: string;
     notifications: string;
     language: string;
+    /** تم برنامه (روشن/تاریک/سبز). */
+    theme: string;
+    lightTheme: string;
+    darkTheme: string;
+    greenTheme: string;
+    toggleTheme: string;
     loading: string;
     error: string;
     retry: string;
@@ -94,6 +101,19 @@ export interface Dictionary {
     clearFilters: string;
     results: string;
     createdAt: string;
+    /** انتخاب‌گر تاریخ تقویم جلالی. */
+    datePicker: {
+      openCalendar: string;
+      previousMonth: string;
+      nextMonth: string;
+      previousYear: string;
+      nextYear: string;
+      today: string;
+      clear: string;
+      time: string;
+      /** الگوی ورود دستی، مثلاً «۱۴۰۵/۰۷/۰۸». */
+      formatHint: string;
+    };
   };
   errors: {
     generic: string;
@@ -292,6 +312,24 @@ export interface Dictionary {
     deleteConfirmTitle: string;
     deleteConfirmDescription: string;
     hasSubordinates: string;
+    /** ورود گروهی از فایل اکسل. */
+    importTitle: string;
+    importDescription: string;
+    importButton: string;
+    importButtonHint: string;
+    importSelectFile: string;
+    importSelectedFile: string;
+    importNoFile: string;
+    importUploading: string;
+    importResultTitle: string;
+    importResultSummary: string;
+    importRowCreated: string;
+    importRowSkipped: string;
+    importRowFailed: string;
+    importColumnEmployeeCode: string;
+    importColumnRow: string;
+    importColumnFullName: string;
+    importColumnResult: string;
   };
   dataScope: {
     own: string;
@@ -323,6 +361,7 @@ export interface Dictionary {
     showProgressBar: string;
     singleResponsePerUser: string;
     selectQuestionnaire: string;
+    noActiveQuestionnaires: string;
     searchPlaceholder: string;
     noSurveys: string;
     noSurveysDescription: string;
@@ -375,6 +414,97 @@ export interface Dictionary {
     instantiateDescription: string;
     newSurveyCode: string;
     surveyInstantiated: string;
+  };
+  questionnaires: {
+    title: string;
+    description: string;
+    newQuestionnaire: string;
+    editQuestionnaire: string;
+    code: string;
+    title_: string;
+    descriptionLabel: string;
+    status: string;
+    version: string;
+    sections: string;
+    questions: string;
+    createdAt: string;
+    searchPlaceholder: string;
+    noQuestionnaires: string;
+    noQuestionnairesDescription: string;
+    /** وضعیت‌های چرخه‌ی عمر. */
+    draft: string;
+    activeStatus: string;
+    archived: string;
+    all: string;
+    /** اکشن‌ها. */
+    publish: string;
+    archive: string;
+    publishHint: string;
+    questionnaireCreated: string;
+    questionnaireUpdated: string;
+    questionnaireDeleted: string;
+    questionnairePublished: string;
+    questionnaireArchived: string;
+    deleteConfirmTitle: string;
+    deleteConfirmDescription: string;
+    publishConfirmTitle: string;
+    publishConfirmDescription: string;
+    archiveConfirmTitle: string;
+    archiveConfirmDescription: string;
+    draftOnly: string;
+    activeOnly: string;
+    viewStructure: string;
+    /** بخش‌ها. */
+    sectionsLabel: string;
+    addSection: string;
+    removeSection: string;
+    sectionTitle: string;
+    sectionTitleEn: string;
+    isOptionalSection: string;
+    emptySection: string;
+    noSections: string;
+    noSectionsDescription: string;
+    /** آیتم‌ها (سؤال‌های پرسشنامه). */
+    itemsLabel: string;
+    addItem: string;
+    removeItem: string;
+    selectQuestion: string;
+    searchQuestions: string;
+    noQuestions: string;
+    noQuestionsDescription: string;
+    isRequired: string;
+    titleOverride: string;
+    titleOverrideHint: string;
+    questionType: string;
+    answerOptions: string;
+    noAnswerOptions: string;
+    scaleMax: string;
+    /** برچسب انواع سؤال. */
+    typeSingleChoice: string;
+    typeMultipleChoice: string;
+    typeRating: string;
+    typeYesNo: string;
+    typeShortText: string;
+    typeLongText: string;
+    typeNumber: string;
+    /** جزئیات ساختار. */
+    structureTitle: string;
+    structureDescription: string;
+    requiredBadge: string;
+    optionalBadge: string;
+    /** ایجاد سؤال جدید در کتابخانه، از داخل بخش پرسشنامه. */
+    newQuestion: string;
+    newQuestionDescription: string;
+    questionCode: string;
+    questionText: string;
+    questionTextEn: string;
+    addOption: string;
+    removeOption: string;
+    optionCode: string;
+    optionText: string;
+    noOptionsYet: string;
+    scaleMaxHint: string;
+    questionCreated: string;
   };
   campaigns: {
     title: string;
@@ -733,6 +863,18 @@ export interface Dictionary {
     statusRunning: string;
     statusSucceeded: string;
     statusFailed: string;
+    /** نمایش نتایج روی صفحه. */
+    resultsTitle: string;
+    resultsDescription: string;
+    resultsFor: string;
+    resultsEmpty: string;
+    resultsEmptyDescription: string;
+    resultsLoading: string;
+    generatedAt: string;
+    generatedBy: string;
+    rows: string;
+    showResults: string;
+    hideResults: string;
     /** کدهای خطای سمت سرور. */
     errorReportNotFound: string;
     errorReportArchived: string;

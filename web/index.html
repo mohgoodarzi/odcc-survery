@@ -8,6 +8,8 @@
     <!--
       اسکریپت درون‌خطی، lang و dir را قبل از اولین رنگ‌پردازی تنظیم می‌کند تا
       چشمک جهت اشتباه (FOUC) رخ ندهد. فرهنگ از مسیر فعلی خوانده می‌شود.
+      تم نیز از تنظیم ذخیره‌شده (یا ترجیح سیستمی) خوانده و اعمال می‌شود
+      تا چشمک تم اشتباه رخ ندهد.
     -->
     <script>
       (function () {
@@ -17,6 +19,25 @@
         var html = document.documentElement;
         html.lang = culture;
         html.dir = culture === 'fa' ? 'rtl' : 'ltr';
+
+        var storedTheme = null;
+        try {
+          storedTheme = localStorage.getItem('odcc.survey.theme');
+        } catch (e) {}
+        var knownThemes = ['light', 'dark', 'green'];
+        var prefersDark = false;
+        try {
+          prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        } catch (e) {}
+        var theme = knownThemes.indexOf(storedTheme) !== -1
+          ? storedTheme
+          : (prefersDark ? 'dark' : 'light');
+        html.classList.remove('dark', 'green');
+        if (theme === 'dark' || theme === 'green') {
+          html.classList.add(theme);
+        }
+        // تم سبز هم مانند تاریک، یک تم تیره است: کنترل‌های بومیِ تیره.
+        html.style.colorScheme = theme === 'light' ? 'light' : 'dark';
       })();
     </script>
 

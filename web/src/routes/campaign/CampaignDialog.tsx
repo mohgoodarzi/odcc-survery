@@ -24,6 +24,7 @@ import {
   useUpdateCampaign
 } from '@/api/hooks';
 import { Dialog } from '@/components/ui/dialog';
+import { DateTimePicker } from '@/components/ui/date-picker';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -31,6 +32,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Dictionary } from '@/i18n/types';
+import { isoToLocalDateTime, localDateTimeToIso } from '@/lib/datetime';
 
 interface CampaignDialogProps {
   open: boolean;
@@ -187,7 +189,7 @@ export function CampaignDialog({ open, onClose, campaignId }: CampaignDialogProp
 
       return {
         id: reminder.id ?? null,
-        sendAt: toIso(reminder.sendAt)!,
+        sendAt: localDateTimeToIso(reminder.sendAt)!,
         localizations: reminderLocalizations
       };
     });
@@ -198,8 +200,8 @@ export function CampaignDialog({ open, onClose, campaignId }: CampaignDialogProp
       audienceType: form.audienceType,
       includeInactiveEmployees: form.includeInactiveEmployees,
       channel: form.channel,
-      scheduledAt: toIso(form.scheduledAt),
-      endsAt: toIso(form.endsAt),
+      scheduledAt: localDateTimeToIso(form.scheduledAt),
+      endsAt: localDateTimeToIso(form.endsAt),
       localizations,
       // فقط اهدافِ مرتبط با نوع جمعیت هدف ارسال می‌شوند تا داده‌ی کهنه ارسال نشود.
       targetOrgUnitIds: form.audienceType === TargetAudienceType.OrgUnits ? form.targetOrgUnitIds : [],
@@ -404,24 +406,20 @@ export function CampaignDialog({ open, onClose, campaignId }: CampaignDialogProp
         )}
 
         <FormField label={t.campaigns.scheduledAt} htmlFor="campaignScheduledAt" hint={t.campaigns.scheduleHint}>
-          <Input
+          <DateTimePicker
             id="campaignScheduledAt"
-            type="datetime-local"
             value={form.scheduledAt}
-            onChange={(event) => updateField('scheduledAt', event.target.value)}
+            onChange={(value) => updateField('scheduledAt', value)}
             disabled={isSaving}
-            dir="ltr"
           />
         </FormField>
 
         <FormField label={t.campaigns.endsAt} htmlFor="campaignEndsAt" error={errors.endsAt}>
-          <Input
+          <DateTimePicker
             id="campaignEndsAt"
-            type="datetime-local"
             value={form.endsAt}
-            onChange={(event) => updateField('endsAt', event.target.value)}
+            onChange={(value) => updateField('endsAt', value)}
             disabled={isSaving}
-            dir="ltr"
           />
         </FormField>
 
@@ -459,13 +457,11 @@ export function CampaignDialog({ open, onClose, campaignId }: CampaignDialogProp
                 required
                 error={errors[`reminder-${index}-sendAt`]}
               >
-                <Input
+                <DateTimePicker
                   id={`reminder-sendAt-${index}`}
-                  type="datetime-local"
                   value={reminder.sendAt}
-                  onChange={(event) => updateReminder(index, 'sendAt', event.target.value)}
+                  onChange={(value) => updateReminder(index, 'sendAt', value)}
                   disabled={isSaving}
-                  dir="ltr"
                 />
               </FormField>
 
@@ -580,8 +576,8 @@ function toForm(existing: Campaign): CampaignFormState {
     channel: existing.channel,
     includeInactiveEmployees: existing.includeInactiveEmployees,
     includeDescendants: existing.targetUnits.some((unit) => unit.includeDescendants),
-    scheduledAt: toLocalInputValue(existing.scheduledAt),
-    endsAt: toLocalInputValue(existing.endsAt),
+    scheduledAt: isoToLocalDateTime(existing.scheduledAt),
+    endsAt: isoToLocalDateTime(existing.endsAt),
     targetOrgUnitIds: existing.targetUnits.map((unit) => unit.orgUnitId),
     targetEmployeeIds: existing.targetMembers.map((member) => member.employeeId),
     reminders: existing.reminders.map((reminder) => {
@@ -589,32 +585,12 @@ function toForm(existing: Campaign): CampaignFormState {
       return {
         key: reminder.id,
         id: reminder.id,
-        sendAt: toLocalInputValue(reminder.sendAt),
+        sendAt: isoToLocalDateTime(reminder.sendAt),
         subject: reminderPersian?.subject ?? reminder.subject,
         body: reminderPersian?.body ?? ''
       };
     })
   };
-}
-
-/**
- * تبدیل مقدار ورودی datetime-local (زمان محلی) به ISO 8601 با منطقه‌ی UTC.
- * کاربر زمان را به زمان محلی خود انتخاب می‌کند و سرور در UTC کار می‌کند.
- */
-function toIso(localDateTime: string): string | null {
-  if (!localDateTime) return null;
-  const parsed = new Date(localDateTime);
-  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
-}
-
-/** تبدیل ISO 8601 سرور به مقدار ورودی datetime-local (زمان محلی). */
-function toLocalInputValue(iso: string | null): string {
-  if (!iso) return '';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function audienceOptions(t: Dictionary['campaigns']) {

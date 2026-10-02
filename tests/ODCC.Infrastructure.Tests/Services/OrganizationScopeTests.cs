@@ -287,7 +287,7 @@ public class OrganizationScopeTests
         var result = await service.SearchAsync(new EmployeeSearchRequest(SearchText: null, OrgUnitId: null), default);
 
         result.IsSuccess.Should().BeTrue();
-        result.Value!.Select(e => e.EmployeeCode).Should().BeEquivalentTo(ApEmployeeCodes);
+        result.Value!.Items.Select(e => e.EmployeeCode).Should().BeEquivalentTo(ApEmployeeCodes);
     }
 
     [Fact]
@@ -304,7 +304,7 @@ public class OrganizationScopeTests
             IncludeDescendants: true), default);
 
         result.IsSuccess.Should().BeTrue();
-        result.Value!.Select(e => e.EmployeeCode).Should().BeEquivalentTo(ApEmployeeCodes);
+        result.Value!.Items.Select(e => e.EmployeeCode).Should().BeEquivalentTo(ApEmployeeCodes);
     }
 
     [Fact]
@@ -316,7 +316,7 @@ public class OrganizationScopeTests
 
         var result = await service.SearchAsync(new EmployeeSearchRequest(SearchText: null, OrgUnitId: null), default);
 
-        result.Value!.Should().HaveCount(3);
+        result.Value!.Items.Should().HaveCount(3);
     }
 
     [Fact]

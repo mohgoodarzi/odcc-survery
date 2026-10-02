@@ -121,7 +121,7 @@ public sealed class ActionManagementAuditEventListener(
 
     private static string SourceLabel(ActionSource source) => source switch
     {
-        ActionSource.AnalyticsAlert => "هشدار تحلیلات",
+        ActionSource.AnalyticsAlert => "هشدار تحلیل ها",
         ActionSource.SurveyFinding => "یافته‌ی نظرسنجی",
         _ => "دستی"
     };

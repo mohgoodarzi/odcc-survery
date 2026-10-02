@@ -13,12 +13,14 @@ import { useLanguage } from '@/i18n/LanguageProvider';
 import { useCampaignableSurveys, useOrgUnits } from '@/api/hooks';
 import { useCreateReport, useReport, useUpdateReport } from '@/api/reportsHooks';
 import { Dialog } from '@/components/ui/dialog';
+import { DateTimePicker } from '@/components/ui/date-picker';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import type { Dictionary } from '@/i18n/types';
+import { isoToLocalDateTime, localDateTimeToIso } from '@/lib/datetime';
 
 interface ReportDialogProps {
   open: boolean;
@@ -105,8 +107,8 @@ export function ReportDialog({ open, onClose, reportId }: ReportDialogProps) {
       // فقط نظرسنجی برای انواعی که به آن وابسته‌اند ارسال می‌شود تا داده‌ی
       // کهله روی تعریف گزارش باقی نماند.
       surveyId: needsSurvey ? form.surveyId : null,
-      from: toIso(form.from),
-      to: toIso(form.to),
+      from: localDateTimeToIso(form.from),
+      to: localDateTimeToIso(form.to),
       orgUnitId: form.orgUnitId || null,
       includeDescendants: form.includeDescendants,
       retentionCount: form.retentionCount
@@ -274,24 +276,20 @@ export function ReportDialog({ open, onClose, reportId }: ReportDialogProps) {
         </FormField>
 
         <FormField label={t.reports.windowFrom} htmlFor="reportFrom">
-          <Input
+          <DateTimePicker
             id="reportFrom"
-            type="datetime-local"
             value={form.from}
-            onChange={(event) => updateField('from', event.target.value)}
+            onChange={(value) => updateField('from', value)}
             disabled={isSaving}
-            dir="ltr"
           />
         </FormField>
 
         <FormField label={t.reports.windowTo} htmlFor="reportTo" error={errors.to}>
-          <Input
+          <DateTimePicker
             id="reportTo"
-            type="datetime-local"
             value={form.to}
-            onChange={(event) => updateField('to', event.target.value)}
+            onChange={(value) => updateField('to', value)}
             disabled={isSaving}
-            dir="ltr"
           />
         </FormField>
 
@@ -378,32 +376,12 @@ function toForm(existing: ReportDefinition): ReportFormState {
     // گزارشی که از قبل فعال است را به پیش‌نویس تبدیل نکند.
     activateImmediately: existing.status === ReportStatus.Active,
     surveyId: existing.surveyId ?? '',
-    from: toLocalInputValue(existing.from),
-    to: toLocalInputValue(existing.to),
+    from: isoToLocalDateTime(existing.from),
+    to: isoToLocalDateTime(existing.to),
     orgUnitId: existing.orgUnitId ?? '',
     includeDescendants: existing.includeDescendants,
     retentionCount: existing.retentionCount
   };
-}
-
-/**
- * تبدیل مقدار ورودی datetime-local (زمان محلی) به ISO 8601 با منطقه‌ی UTC.
- * کاربر زمان را به زمان محلی خود انتخاب می‌کند و سرور در UTC کار می‌کند.
- */
-function toIso(localDateTime: string): string | null {
-  if (!localDateTime) return null;
-  const parsed = new Date(localDateTime);
-  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
-}
-
-/** تبدیل ISO 8601 سرور به مقدار ورودی datetime-local (زمان محلی). */
-function toLocalInputValue(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function typeOptions(t: Dictionary['reports']) {

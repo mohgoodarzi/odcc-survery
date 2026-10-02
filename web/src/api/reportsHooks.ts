@@ -5,8 +5,7 @@ import {
   ReportExecutionStatus,
   type ExecutionSearchRequest,
   type SaveReportRequest
-} from '@/api/reports';
-import { useLanguage } from '@/i18n/LanguageProvider';
+} from '@/api/reports';import { useLanguage } from '@/i18n/LanguageProvider';
 
 /**
  * کلیدهای کوئری گزارش‌گیری تا invalidation بین صفحات یکپارچه باشد.
@@ -21,6 +20,7 @@ export const reportsQueryKeys = {
   ) => ['reports', 'search', searchText, type, status, includeArchived, page] as const,
   reports: ['reports'] as const,
   report: (id: string | null) => ['reports', 'detail', id] as const,
+  reportData: (id: string | null) => ['reports', 'data', id] as const,
   executionSearch: (
     reportDefinitionId: string | null,
     status: ReportExecutionStatus | null,
@@ -75,6 +75,20 @@ export function useReport(id: string | null) {
   return useQuery({
     queryKey: reportsQueryKeys.report(id),
     queryFn: ({ signal }) => reportsApi.getById(culture, id!, signal),
+    enabled: !!id
+  });
+}
+
+/**
+ * داده‌ی نمایش‌گرای یک تعریف گزارش برای رندر جدول نتایج روی صفحه.
+ * فقط زمانی اجرا می‌شود که شناسه‌ای تنظیم شده باشد.
+ */
+export function useReportData(id: string | null) {
+  const { culture } = useLanguage();
+
+  return useQuery({
+    queryKey: reportsQueryKeys.reportData(id),
+    queryFn: ({ signal }) => reportsApi.getData(culture, id!, signal),
     enabled: !!id
   });
 }

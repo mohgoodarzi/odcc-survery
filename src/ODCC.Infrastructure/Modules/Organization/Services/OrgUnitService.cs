@@ -35,27 +35,10 @@ public sealed class OrgUnitService(
 
     public async Task<Result<IReadOnlyList<OrgUnitDto>>> ListAsync(bool activeOnly, CancellationToken ct = default)
     {
-        var scope = await _orgScopeProvider.GetCurrentScopeAsync(ct);
-
-        // fail-closed: دامنه بدون Sicht سازمانی قابل‌مشاهده → لیست خالی.
-        if (!scope.IsUnrestricted && !scope.HasVisibleOrgScope)
-        {
-            return Result.Success<IReadOnlyList<OrgUnitDto>>([]);
-        }
-
-        var query = _dbContext.OrgUnits.AsNoTracking();
-        if (activeOnly)
-        {
-            query = query.Where(u => u.IsActive);
-        }
-
-        if (!scope.IsUnrestricted)
-        {
-            var prefix = scope.VisiblePathPrefix!;
-            query = query.Where(u => u.Path == prefix || u.Path.StartsWith(prefix + "/"));
-        }
-
-        var units = await query.OrderBy(u => u.Path).ToListAsync(ct);
+        // مسیر «لیست» (مثلاً dropdown انتخاب واحد در فرم کارمند) و مسیر «درخت»
+        // (صفحه‌ی مدیریت واحدها) هر دو از همین کوئریِ مشترک ساخته می‌شوند تا
+        // همیشه همان مجموعه‌ی واحدها را با همان قوانین فیلترگذاری ببینند.
+        var units = await GetVisibleUnitsAsync(activeOnly, ct);
 
         var parentNames = await GetParentNamesAsync(units, ct);
         var employeeCounts = await GetEmployeeCountsAsync(units, ct);
@@ -94,23 +77,14 @@ public sealed class OrgUnitService(
 
     public async Task<Result<IReadOnlyList<OrgUnitTreeDto>>> GetTreeAsync(CancellationToken ct = default)
     {
-        var scope = await _orgScopeProvider.GetCurrentScopeAsync(ct);
-
-        // fail-closed: دامنه بدون Sicht سازمانی قابل‌مشاهده → درخت خالی.
-        if (!scope.IsUnrestricted && !scope.HasVisibleOrgScope)
-        {
-            return Result.Success<IReadOnlyList<OrgUnitTreeDto>>([]);
-        }
-
-        var query = _dbContext.OrgUnits.AsNoTracking().Where(u => u.IsActive);
-
-        if (!scope.IsUnrestricted)
-        {
-            var prefix = scope.VisiblePathPrefix!;
-            query = query.Where(u => u.Path == prefix || u.Path.StartsWith(prefix + "/"));
-        }
-
-        var units = await query.OrderBy(u => u.Path).ToListAsync(ct);
+        // درختِ صفحه‌ی مدیریت دقیقاً همان مجموعه‌ی واحدهای مسیر «لیست» را نشان
+        // می‌دهد: همه‌ی واحدهای موجودِ قابل‌مشاهده در دامنه‌ی کاربر، شامل واحدهای
+        // غیرفعال. فیلتر نکردن IsActive در اینجا عمدی است — غیرفعال کردن یک واحد
+        // نباید آن را از صفحه‌ی مدیریت پنهان کند (گره غیرفعال با نشانگر «غیرفعال»
+        // نمایش داده می‌شود و مدیر می‌تواند دوباره آن را فعال کند). همچنین این
+        // باعث می‌شود dropdown کارمندان و لیست مدیریت همیشه داده‌ی یکسانی داشته
+        // باشند و دیگر واحدی در dropdown ظاهر نمی‌شود که در مدیریت غایب باشد.
+        var units = await GetVisibleUnitsAsync(activeOnly: false, ct);
 
         var lookup = units.ToLookup(u => u.ParentId);
         var visibleIds = units.Select(u => u.Id).ToHashSet();
@@ -340,6 +314,45 @@ public sealed class OrgUnitService(
         await _unitOfWork.SaveChangesAsync(ct);
 
         return Result.Success();
+    }
+
+    /// <summary>
+    /// کوئری پایه‌ی واحدهای سازمانی قابل‌مشاهده توسط کاربر جاری.
+    ///
+    /// این متد تنها منبع داده‌ی هر دو مسیر «لیست» و «درخت» است تا قوانین
+    /// فیلترگذاری بین بخش مدیریت واحدهای سازمانی و dropdown انتخاب واحد در
+    /// فرم کارمند (و هر مصرف‌کننده‌ی دیگر) کاملاً یکسان بماند:
+    /// <list type="bullet">
+    /// <item>حذف نرم به‌صورت سراسری توسط DbContext فیلتر می‌شود (هر دو مسیر یکسان).</item>
+    /// <item>محدودسازی دامنه‌ی سازمانی بر اساس مسیر مادی لنگر کاربر.</item>
+    /// <item><paramref name="activeOnly"/> فقط برای مسیرهایی معنی دارد که باید
+    /// واحدهای غیرفعال را پنهان کنند؛ صفحه‌ی مدیریت همواره <c>false</c> می‌فرستد.</item>
+    /// </list>
+    /// <b>fail-closed:</b> کاربر بدون دامنه‌ی قابل‌مشاهده، لیست خالی می‌بیند.
+    /// </summary>
+    private async Task<List<OrgUnit>> GetVisibleUnitsAsync(bool activeOnly, CancellationToken ct)
+    {
+        var scope = await _orgScopeProvider.GetCurrentScopeAsync(ct);
+
+        if (!scope.IsUnrestricted && !scope.HasVisibleOrgScope)
+        {
+            return [];
+        }
+
+        var query = _dbContext.OrgUnits.AsNoTracking();
+
+        if (activeOnly)
+        {
+            query = query.Where(u => u.IsActive);
+        }
+
+        if (!scope.IsUnrestricted)
+        {
+            var prefix = scope.VisiblePathPrefix!;
+            query = query.Where(u => u.Path == prefix || u.Path.StartsWith(prefix + "/"));
+        }
+
+        return await query.OrderBy(u => u.Path).ToListAsync(ct);
     }
 
     /// <summary>

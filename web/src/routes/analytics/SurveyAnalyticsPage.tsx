@@ -20,7 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState, ErrorState, TableLoading } from '@/components/ui/states';
-import { formatCount, formatNumber } from '@/i18n/format';
+import { formatCount, formatDateTime, formatNumber } from '@/i18n/format';
 import { MetricCard } from './MetricCard';
 
 /**
@@ -130,7 +130,7 @@ export function SurveyAnalyticsPage() {
             <MetricCard
               label={t.analytics.computedAt}
               value={null}
-              emptyLabel={new Date(data.computedAt).toLocaleDateString(CULTURE_LOCALE(culture))}
+              emptyLabel={formatDateTime(data.computedAt, culture)}
             />
           </div>
 
@@ -225,10 +225,6 @@ export function SurveyAnalyticsPage() {
       ) : null}
     </AppLayout>
   );
-}
-
-function CULTURE_LOCALE(culture: string): string {
-  return culture === 'fa' ? 'fa-IR' : 'en-US';
 }
 
 interface QuestionAnalysisProps {

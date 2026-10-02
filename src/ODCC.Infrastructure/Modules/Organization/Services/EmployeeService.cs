@@ -6,6 +6,7 @@ using ODCC.Application.Modules.Organization.Abstractions;
 using ODCC.Application.Modules.Organization.Dtos;
 using ODCC.Domain.Common;
 using ODCC.Domain.Modules.Organization.Entities;
+using ODCC.Infrastructure.Modules.Organization.ExcelImport;
 using ODCC.Infrastructure.Modules.Organization.Persistence;
 
 namespace ODCC.Infrastructure.Modules.Organization.Services;
@@ -19,6 +20,7 @@ namespace ODCC.Infrastructure.Modules.Organization.Services;
 public sealed class EmployeeService(
     IEmployeeRepository employeeRepository,
     IOrgUnitRepository orgUnitRepository,
+    IPositionRepository positionRepository,
     IOrgScopeProvider orgScopeProvider,
     ICurrentUserService currentUserService,
     IUserLookupService userLookupService,
@@ -27,13 +29,14 @@ public sealed class EmployeeService(
 {
     private readonly IEmployeeRepository _employeeRepository = employeeRepository;
     private readonly IOrgUnitRepository _orgUnitRepository = orgUnitRepository;
+    private readonly IPositionRepository _positionRepository = positionRepository;
     private readonly IOrgScopeProvider _orgScopeProvider = orgScopeProvider;
     private readonly ICurrentUserService _currentUserService = currentUserService;
     private readonly IUserLookupService _userLookupService = userLookupService;
     private readonly IOrganizationUnitOfWork _unitOfWork = unitOfWork;
     private readonly OrganizationDbContext _dbContext = dbContext;
 
-    public async Task<Result<IReadOnlyList<EmployeeSummaryDto>>> SearchAsync(EmployeeSearchRequest request, CancellationToken ct = default)
+    public async Task<Result<PagedResult<EmployeeSummaryDto>>> SearchAsync(EmployeeSearchRequest request, CancellationToken ct = default)
     {
         // محدودسازی دامنه: مسیر قابل‌مشاهده توسط کاربر جاری.
         var scope = await _orgScopeProvider.GetCurrentScopeAsync(ct);
@@ -44,7 +47,13 @@ public sealed class EmployeeService(
         // GetByUserIdAsync قابل دسترسی است، نه از جستجوی سازمانی.
         if (!scope.IsUnrestricted && !scope.HasVisibleOrgScope)
         {
-            return Result.Success<IReadOnlyList<EmployeeSummaryDto>>([]);
+            return Result.Success(new PagedResult<EmployeeSummaryDto>
+            {
+                Items = [],
+                TotalCount = 0,
+                Page = Math.Max(request.Page, 1),
+                PageSize = request.PageSize
+            });
         }
 
         if (!scope.IsUnrestricted)
@@ -67,6 +76,7 @@ public sealed class EmployeeService(
         }
 
         var employees = await _employeeRepository.SearchAsync(effectiveRequest, scope.VisiblePathPrefix, ct);
+        var totalCount = await _employeeRepository.SearchCountAsync(effectiveRequest, scope.VisiblePathPrefix, ct);
 
         var unitNames = await GetUnitNamesAsync(employees, ct);
         var positionTitles = await GetPositionTitlesAsync(employees, ct);
@@ -78,7 +88,13 @@ public sealed class EmployeeService(
             positionTitles.GetValueOrDefault(e.PositionId ?? Guid.Empty),
             managerNames.GetValueOrDefault(e.ManagerId ?? Guid.Empty))).ToList();
 
-        return Result.Success<IReadOnlyList<EmployeeSummaryDto>>(dtos);
+        return Result.Success(new PagedResult<EmployeeSummaryDto>
+        {
+            Items = dtos,
+            TotalCount = totalCount,
+            Page = effectiveRequest.Page,
+            PageSize = effectiveRequest.PageSize
+        });
     }
 
     public async Task<Result<EmployeeDto>> GetByIdAsync(Guid id, CancellationToken ct = default)
@@ -186,6 +202,256 @@ public sealed class EmployeeService(
         await _unitOfWork.SaveChangesAsync(ct);
 
         return Result.Success(await ToDtoAsync(employee, ct));
+    }
+
+    public async Task<Result<EmployeeImportResultDto>> ImportAsync(Stream excelStream, CancellationToken ct = default)
+    {
+        // 1. کنترل دامنه‌ی دسترسی (fail-closed)
+        var scope = await _orgScopeProvider.GetCurrentScopeAsync(ct);
+        if (!scope.IsUnrestricted && !scope.HasVisibleOrgScope)
+        {
+            return Result.Failure<EmployeeImportResultDto>(
+                "access_denied", "شما اجازه‌ی ورود اطلاعات کارمندان در این دامنه را ندارید.");
+        }
+
+        // 2. تجزیه‌ی فایل اکسل به ردیف‌های خام
+        List<EmployeeImportRow> rows;
+        try
+        {
+            rows = EmployeeExcelParser.Parse(excelStream);
+        }
+        catch (EmployeeImportException ex)
+        {
+            return Result.Failure<EmployeeImportResultDto>(ex.Code, ex.Message);
+        }
+        catch (Exception)
+        {
+            return Result.Failure<EmployeeImportResultDto>(
+                "import_parse_failed", "فایل قابل خواندن نیست. مطمئن شوید یک فایل اکسل معتبر (.xlsx) است.");
+        }
+
+        // 3. بارگذاری یکباره‌ی ارجاعات لازم (دامنه، از کار افتادگی، موقعیت‌ها و مدیران)
+
+        var codes = rows
+            .Select(r => r.EmployeeCode?.Trim() ?? string.Empty)
+            .Where(c => c.Length > 0)
+            .Distinct()
+            .ToList();
+
+        var managerCodes = rows
+            .Select(r => r.ManagerCode?.Trim() ?? string.Empty)
+            .Where(c => c.Length > 0)
+            .Distinct()
+            .ToList();
+
+        var orgCodes = rows
+            .Select(r => r.OrgUnitCode?.Trim() ?? string.Empty)
+            .Where(c => c.Length > 0)
+            .Distinct()
+            .ToList();
+
+        var positionCodes = rows
+            .Select(r => r.PositionCode?.Trim() ?? string.Empty)
+            .Where(c => c.Length > 0)
+            .Distinct()
+            .ToList();
+
+        // کدهای پرسنلی موجود در پایگاه داده. فیلتر حذف نرم نادیده گرفته می‌شود
+        // چون اندیس یکتا ردیف‌های حذف‌شده را هم پوشش می‌دهد و باید از نقض آن جلوگیری کنیم.
+        var existingCodes = await _dbContext.Employees
+            .IgnoreQueryFilters()
+            .Where(e => codes.Contains(e.EmployeeCode))
+            .Select(e => e.EmployeeCode)
+            .ToListAsync(ct);
+
+        var managers = new List<Employee>();
+        if (managerCodes.Count > 0)
+        {
+            managers = await _dbContext.Employees
+                .Where(e => managerCodes.Contains(e.EmployeeCode))
+                .ToListAsync(ct);
+        }
+
+        var units = await _dbContext.OrgUnits
+            .Where(u => orgCodes.Contains(u.Code))
+            .ToListAsync(ct);
+
+        var positions = await _dbContext.Positions
+            .Where(p => positionCodes.Contains(p.Code))
+            .ToListAsync(ct);
+
+        // 4.process rows
+        var validator = new SaveEmployeeRequestValidator();
+        var results = new List<EmployeeImportRowResultDto>();
+        var created = new List<Employee>(rows.Count);
+        var seenCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // کارمندانی که در همین فایل ایجاد می‌شوند (برای ارجاع به عنوان مدیر).
+        var creatingByCode = new Dictionary<string, Employee>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var row in rows)
+        {
+            var code = row.EmployeeCode?.Trim() ?? string.Empty;
+            var firstName = row.FirstName?.Trim() ?? string.Empty;
+            var lastName = row.LastName?.Trim() ?? string.Empty;
+
+            var result = new EmployeeImportRowResultDto
+            {
+                RowNumber = row.RowNumber,
+                EmployeeCode = code,
+                FullName = $"{firstName} {lastName}".Trim()
+            };
+
+            // (a) کد پرسنلی تکراری در فایل یا پایگاه داده -> نادیده‌گیری
+            if (code.Length > 0 && (seenCodes.Contains(code) || existingCodes.Contains(code)))
+            {
+                result.Outcome = "skipped";
+                result.Message = "کد پرسنلی تکراری است؛ این ردیف نادیده گرفته شد.";
+                results.Add(result);
+                continue;
+            }
+
+            // (b) ساخت درخواست
+            DateOnly? startDate = EmployeeExcelParser.ParseDate(row.StartDateText) ?? DateOnly.FromDateTime(DateTime.UtcNow);
+
+            var request = new SaveEmployeeRequest
+            {
+                EmployeeCode = code,
+                NationalCode = Trimmed(row.NationalCode),
+                FirstName = firstName,
+                LastName = lastName,
+                FatherName = Trimmed(row.FatherName),
+                // OrgUnitId در ادامه تنظیم می‌شود
+                Status = EmployeeExcelParser.ParseStatus(row.StatusText),
+                StartDate = startDate.Value,
+                EndDate = EmployeeExcelParser.ParseDate(row.EndDateText),
+                WorkEmail = Trimmed(row.WorkEmail),
+                InternalPhone = Trimmed(row.InternalPhone),
+                PositionId = null,
+                ManagerId = null
+            };
+
+            var messages = new List<string>();
+
+            // (c) اعتبارسنجی
+
+            // واحد سازمانی
+            var unit = units.FirstOrDefault(u =>
+                string.Equals(u.Code, row.OrgUnitCode?.Trim() ?? string.Empty, StringComparison.OrdinalIgnoreCase));
+
+            if (unit is null)
+            {
+                messages.Add($"کد واحد سازمانی «{row.OrgUnitCode?.Trim() ?? "—"}» پیدا نشد.");
+            }
+            else
+            {
+                request = request with { OrgUnitId = unit.Id };
+
+                if (!scope.CanAccess(unit.Id, unit.Path))
+                {
+                    messages.Add("واحد سازمانی خارج از دامنه‌ی دسترسی شماست.");
+                }
+            }
+
+            // موقعیت شغلی
+            if (!string.IsNullOrWhiteSpace(row.PositionCode))
+            {
+                var position = positions.FirstOrDefault(p =>
+                    string.Equals(p.Code, row.PositionCode!.Trim(), StringComparison.OrdinalIgnoreCase));
+
+                if (position is null)
+                {
+                    messages.Add($"کد موقعیت شغلی «{row.PositionCode!.Trim()}» پیدا نشد.");
+                }
+                else
+                {
+                    request = request with { PositionId = position.Id };
+                }
+            }
+
+            // مدیر (موجود در پایگاه داده یا ایجادشده در همین فایل)
+            if (!string.IsNullOrWhiteSpace(row.ManagerCode))
+            {
+                var managerCode = row.ManagerCode!.Trim();
+                var manager = managers.FirstOrDefault(m =>
+                    string.Equals(m.EmployeeCode, managerCode, StringComparison.OrdinalIgnoreCase));
+
+                manager ??= creatingByCode.TryGetValue(managerCode, out var creating) ? creating : null;
+
+                if (manager is null)
+                {
+                    messages.Add($"کد پرسنلی مدیر «{managerCode}» پیدا نشد.");
+                }
+                else
+                {
+                    request = request with { ManagerId = manager.Id };
+                }
+            }
+
+            // اعتبارسنج استاندارد (دقیقاً همان قوانین فرم ایجاد کارمند)
+            var validation = await validator.ValidateAsync(request, ct);
+            if (!validation.IsValid)
+            {
+                messages.AddRange(validation.Errors.Select(e => e.ErrorMessage));
+            }
+
+            if (messages.Count > 0)
+            {
+                result.Outcome = "failed";
+                result.Message = string.Join(" ", messages.Distinct());
+                results.Add(result);
+                continue;
+            }
+
+            // (d) ایجاد موجودیت
+            var employee = new Employee
+            {
+                EmployeeCode = request.EmployeeCode,
+                NationalCode = request.NationalCode,
+                FirstName = request.FirstName,
+                LastName = request.LastName,
+                FatherName = request.FatherName,
+                UserId = null,
+                OrgUnitId = request.OrgUnitId,
+                PositionId = request.PositionId,
+                ManagerId = request.ManagerId,
+                Status = request.Status,
+                StartDate = request.StartDate,
+                EndDate = request.EndDate,
+                WorkEmail = request.WorkEmail,
+                InternalPhone = request.InternalPhone
+            };
+
+            await _employeeRepository.AddAsync(employee, ct);
+
+            seenCodes.Add(request.EmployeeCode);
+            creatingByCode[request.EmployeeCode] = employee;
+            created.Add(employee);
+
+            result.Outcome = "created";
+            results.Add(result);
+        }
+
+        // 5. ذخیره‌سازی اتمیک همه‌ی ردیف‌های ایجادشده
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            return Result.Failure<EmployeeImportResultDto>(
+                "import_save_failed",
+                "ذخیره‌سازی ردیف‌ها شکست خورد (احتمالاً کد پرسنلی تکراری). عملیات لغو شد.");
+        }
+
+        return Result.Success(new EmployeeImportResultDto
+        {
+            TotalRows = rows.Count,
+            CreatedCount = created.Count,
+            SkippedCount = results.Count(r => r.Outcome == "skipped"),
+            FailedCount = results.Count(r => r.Outcome == "failed"),
+            Rows = results
+        });
     }
 
     public async Task<Result<EmployeeDto>> UpdateAsync(Guid id, SaveEmployeeRequest request, CancellationToken ct = default)
@@ -405,4 +671,11 @@ public sealed class EmployeeService(
 
     private Task<string?> GetUserNameAsync(Guid userId, CancellationToken ct) =>
         _userLookupService.GetUserNameAsync(userId, ct);
+
+    /// <summary>
+    /// هرس کردن فضاهای خالی؛ مقدار خالی یا فقط‌فضا به <c>null</c> تبدیل می‌شود
+    /// تا فیلدهای اختیاری در ورود گروهی یکدست باشند.
+    /// </summary>
+    private static string? Trimmed(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

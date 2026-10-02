@@ -22,9 +22,11 @@ import { EmptyState, ErrorState, TableLoading } from '@/components/ui/states';
 import { Pagination } from '@/routes/identity/UsersPage';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Dialog } from '@/components/ui/dialog';
+import { DateTimePicker } from '@/components/ui/date-picker';
 import { FormField } from '@/components/ui/form-field';
 import { formatDateTime } from '@/i18n/format';
 import type { Dictionary } from '@/i18n/types';
+import { localDateTimeToIso } from '@/lib/datetime';
 
 /**
  * صفحه‌ی نمونه‌های گردش کار: فهرست صفحه‌بندی‌شده با فیلتر بر اساس وضعیت،
@@ -213,7 +215,7 @@ export function WorkflowInstancesPage() {
                 request: {
                   transitionCode,
                   note: note || null,
-                  approvalExpiresAtUtc: expiresAt
+                  approvalExpiresAtUtc: localDateTimeToIso(expiresAt)
                 }
               },
               { onSuccess: () => setTransitionTarget(null) }
@@ -329,13 +331,11 @@ function TransitionDialog({
             </FormField>
 
             <FormField label={t.workflows.approvalExpiry} htmlFor="transitionExpiry" hint={t.workflows.approvalExpiryHint}>
-              <Input
+              <DateTimePicker
                 id="transitionExpiry"
-                type="datetime-local"
                 value={expiresAt}
-                onChange={(event) => setExpiresAt(event.target.value)}
+                onChange={setExpiresAt}
                 disabled={isPending}
-                dir="ltr"
               />
             </FormField>
           </>

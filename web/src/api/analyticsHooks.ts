@@ -44,12 +44,13 @@ function useInvalidateAnalytics() {
   };
 }
 
-export function useAnalyticsDashboard(filter: AnalyticsFilter | undefined) {
+export function useAnalyticsDashboard(filter: AnalyticsFilter | undefined, enabled = true) {
   const { culture } = useLanguage();
 
   return useQuery({
     queryKey: analyticsQueryKeys.dashboard(filter),
-    queryFn: ({ signal }) => analyticsApi.dashboard(culture, filter, signal)
+    queryFn: ({ signal }) => analyticsApi.dashboard(culture, filter, signal),
+    enabled
   });
 }
 

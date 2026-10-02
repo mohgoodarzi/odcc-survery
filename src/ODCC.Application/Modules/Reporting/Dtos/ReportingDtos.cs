@@ -1,3 +1,4 @@
+using ODCC.Application.Modules.Reporting.Abstractions;
 using ODCC.Domain.Modules.Reporting.Enums;
 
 namespace ODCC.Application.Modules.Reporting.Dtos;
@@ -143,6 +144,35 @@ public sealed record ReportExecutionDto
         ? CompletedAt.Value - StartedAt.Value
         : null;
 }
+
+/// <summary>
+/// داده‌ی نمایش‌گرای یک گزارش: مجموعه‌ای از بخش‌های جدولی.
+///
+/// این DTO دقیقاً همان داده‌ای است که رندر PDF/Excel از آن ساخته می‌شود،
+/// بنابراین جدول روی صفحه با فایل قابل‌دانلود یکسان است. مانند خروجی فایل،
+/// فقط شامل تجمع‌های تحلیلی است و هیچ شناسه‌ی پاسخ‌گویی ندارد.
+/// </summary>
+public sealed record ReportDataBundleDto
+{
+    public string Title { get; init; } = string.Empty;
+    public string Subtitle { get; init; } = string.Empty;
+    public ReportType Type { get; init; }
+    public DateTime GeneratedAt { get; init; }
+    public string GeneratedBy { get; init; } = string.Empty;
+    public IReadOnlyList<ReportSectionDto> Sections { get; init; } = [];
+}
+
+/// <summary>یک بخش جدولی از داده‌ی گزارش.</summary>
+public sealed record ReportSectionDto
+{
+    public string Title { get; init; } = string.Empty;
+    public IReadOnlyList<ReportColumnDto> Columns { get; init; } = [];
+    public IReadOnlyList<IReadOnlyList<object?>> Rows { get; init; } = [];
+    public string? Footnote { get; init; }
+}
+
+/// <summary>یک ستون جدول گزارش برای نمایش روی صفحه.</summary>
+public sealed record ReportColumnDto(string Title, ReportColumnType ColumnType = ReportColumnType.Text);
 
 /// <summary>فایل خروجی یک اجرا برای دانلود.</summary>
 public sealed record ReportArtifact

@@ -75,7 +75,11 @@ function buildHeaders(options: RequestOptions): Record<string, string> {
     Accept: 'application/json'
   };
 
-  if (options.body !== undefined) {
+  // برای FormData، مرورگر خودش Content-Type با boundary را تنظیم می‌کند؛
+  // تنظیم دستی آن باعث خراب شدن درخواست multipart می‌شود.
+  const isFormData = options.body instanceof FormData;
+
+  if (options.body !== undefined && !isFormData) {
     headers['Content-Type'] = 'application/json';
   }
 
@@ -109,11 +113,12 @@ async function sendRequest<T>(
   path: string,
   options: RequestOptions
 ): Promise<T> {
+  const isFormData = options.body instanceof FormData;
   const response = await fetch(`${BASE_PATH}/${culture}${path}`, {
     method: options.method ?? 'GET',
     credentials: 'same-origin',
     headers: buildHeaders(options),
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    body: isFormData ? (options.body as FormData) : (options.body !== undefined ? JSON.stringify(options.body) : undefined),
     signal: options.signal
   });
 
@@ -124,7 +129,7 @@ async function sendRequest<T>(
         method: options.method ?? 'GET',
         credentials: 'same-origin',
         headers: buildHeaders(options),
-        body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+        body: isFormData ? (options.body as FormData) : (options.body !== undefined ? JSON.stringify(options.body) : undefined),
         signal: options.signal
       });
 

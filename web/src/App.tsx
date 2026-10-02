@@ -15,6 +15,7 @@ import { PositionsPage } from '@/routes/organization/PositionsPage';
 import { EmployeesPage } from '@/routes/organization/EmployeesPage';
 import { SurveysPage } from '@/routes/survey/SurveysPage';
 import { SurveyTemplatesPage } from '@/routes/survey/SurveyTemplatesPage';
+import { QuestionnairesPage } from '@/routes/questionnaire/QuestionnairesPage';
 import { CampaignsPage } from '@/routes/campaign/CampaignsPage';
 import { MySurveysPage } from '@/routes/response/MySurveysPage';
 import { RespondentSurveyPage } from '@/routes/response/RespondentSurveyPage';
@@ -111,6 +112,16 @@ export function AppRoutes() {
         element={
           <RequireAuth permissions={[Permissions.Survey.View]}>
             <SurveyTemplatesPage />
+          </RequireAuth>
+        }
+      />
+
+      {/* پرسشنامه‌ها */}
+      <Route
+        path="/:culture/questionnaires"
+        element={
+          <RequireAuth permissions={[Permissions.Questionnaire.View]}>
+            <QuestionnairesPage />
           </RequireAuth>
         }
       />
@@ -250,6 +261,14 @@ export function AppRoutes() {
       />
 
       {/* پیکربندی سامانه */}
+      <Route
+        path="/:culture/settings"
+        element={
+          <RequireAuth permissions={[Permissions.System.View]}>
+            <SystemSettingsPage />
+          </RequireAuth>
+        }
+      />
       <Route
         path="/:culture/system/settings"
         element={

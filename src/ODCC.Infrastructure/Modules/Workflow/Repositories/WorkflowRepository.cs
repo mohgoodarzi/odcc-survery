@@ -123,6 +123,7 @@ public sealed class WorkflowRepository(WorkflowDbContext dbContext) : IWorkflowR
     {
         var query = _dbContext.Workflows
             .Include(w => w.States)
+            .Include(w => w.Transitions)
             .AsNoTracking();
 
         if (request.Status is { } status)
@@ -375,14 +376,15 @@ public sealed class WorkflowApprovalRepository(
         if (request.ApprovableByMe)
         {
             // فیلتر سمت سرور: فقط درخواست‌هایی که کاربر جاری مجوز تأیید آن‌ها را
-            // دارد. اگر گذار مجوزی مشخص نکرده، مجوز مدیریت گردش کار لازم است.
+            // دارد. اگر گذار مجوزی مشخص نکرده، مجوز تأیید گردش کار لازم است
+            // (هماهنگ با WorkflowService.CanDecide).
             var permissions = _currentUserService.Permissions.ToList();
 
             query = permissions.Count == 0
                 ? query.Where(a => false)
                 : query.Where(a =>
                     (a.ApproverPermission != null && permissions.Contains(a.ApproverPermission))
-                    || (a.ApproverPermission == null && permissions.Contains(ODCC.Application.Authorization.Permissions.Workflows.Manage)));
+                    || (a.ApproverPermission == null && permissions.Contains(ODCC.Application.Authorization.Permissions.Workflows.Approve)));
         }
 
         return query;

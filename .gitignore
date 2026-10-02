@@ -31,3 +31,8 @@ logs/
 # Build artifacts
 TestResults/
 .build.exit
+.test.exit
+.vite.exit
+
+# Doc-generation scratch dir (intermediate PDF/HTML parts, debug files, runtime tokens)
+.docgen/

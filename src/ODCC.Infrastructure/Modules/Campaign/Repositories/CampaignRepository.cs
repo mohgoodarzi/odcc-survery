@@ -123,15 +123,14 @@ public sealed class CampaignRepository(CampaignDbContext dbContext) : ICampaignR
         {
             query = query.Where(c => c.Status == status);
         }
+        else if (!request.IncludeArchived)
+        {
+            query = query.Where(c => c.Status != CampaignStatus.Archived);
+        }
 
         if (request.SurveyId is { } surveyId)
         {
             query = query.Where(c => c.SurveyId == surveyId);
-        }
-
-        if (!request.IncludeArchived)
-        {
-            query = query.Where(c => c.Status != CampaignStatus.Archived);
         }
 
         if (!string.IsNullOrWhiteSpace(request.SearchText))

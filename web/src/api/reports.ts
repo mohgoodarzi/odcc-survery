@@ -135,6 +135,40 @@ export interface ReportExecution {
   errorMessage?: string | null;
 }
 
+/** نوع قالب‌بندی یک ستون گزارش (با سمت سرور هم‌خوان است). */
+export enum ReportColumnType {
+  Text = 0,
+  Number = 1,
+  Percent = 2,
+  Date = 3
+}
+
+export interface ReportColumn {
+  title: string;
+  columnType: ReportColumnType;
+}
+
+export interface ReportSection {
+  title: string;
+  columns: ReportColumn[];
+  /** هر ردیف به‌اندازه‌ی ستون‌ها مقدار دارد. */
+  rows: (string | number | null)[][];
+  footnote?: string | null;
+}
+
+/**
+ * داده‌ی نمایش‌گرای یک گزارش: مجموعه‌ای از بخش‌های جدولی.
+ * دقیقاً همان داده‌ای که فایل خروجی از آن رندر می‌شود.
+ */
+export interface ReportDataBundle {
+  title: string;
+  subtitle: string;
+  type: ReportType;
+  generatedAt: string;
+  generatedBy: string;
+  sections: ReportSection[];
+}
+
 function appendSearchParams(path: string, params: Record<string, string>): string {
   const search = new URLSearchParams(params).toString();
   return search ? `${path}?${search}` : path;
@@ -163,6 +197,14 @@ export const reportsApi = {
 
   getById: (culture: Culture, id: string, signal?: AbortSignal) =>
     apiRequest<ReportDefinition>(culture, `/reports/${id}`, { signal }),
+
+  /**
+   * داده‌ی نمایش‌گرای یک تعریف گزارش (بخش‌ها/ستون‌ها/ردیف‌ها) برای
+   * نمایش به‌صورت جدول روی صفحه. همان داده‌ای که فایل خروجی از آن
+   * رندر می‌شود.
+   */
+  getData: (culture: Culture, id: string, signal?: AbortSignal) =>
+    apiRequest<ReportDataBundle>(culture, `/reports/${id}/data`, { signal }),
 
   create: (culture: Culture, request: SaveReportRequest) =>
     apiRequest<ReportDefinition>(culture, '/reports', { method: 'POST', body: request }),

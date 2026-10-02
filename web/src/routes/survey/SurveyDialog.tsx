@@ -6,11 +6,13 @@ import { ApiError } from '@/api/client';
 import { useLanguage } from '@/i18n/LanguageProvider';
 import { queryKeys, useCreateSurvey, useQuestionnaires, useSurvey, useUpdateSurvey } from '@/api/hooks';
 import { Dialog } from '@/components/ui/dialog';
+import { DatePicker } from '@/components/ui/date-picker';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
+import { isoToLocalDate } from '@/lib/datetime';
 
 interface SurveyDialogProps {
   open: boolean;
@@ -185,6 +187,7 @@ export function SurveyDialog({ open, onClose, surveyId }: SurveyDialogProps) {
           htmlFor="surveyQuestionnaire"
           required
           error={errors.questionnaireId}
+          hint={questionnaireOptions.length === 0 ? t.surveys.noActiveQuestionnaires : undefined}
         >
           <Select
             id="surveyQuestionnaire"
@@ -242,24 +245,20 @@ export function SurveyDialog({ open, onClose, surveyId }: SurveyDialogProps) {
         </FormField>
 
         <FormField label={t.surveys.startDate} htmlFor="surveyStartDate">
-          <Input
+          <DatePicker
             id="surveyStartDate"
-            type="date"
             value={form.startDate}
-            onChange={(event) => updateField('startDate', event.target.value)}
+            onChange={(value) => updateField('startDate', value)}
             disabled={isSaving}
-            dir="ltr"
           />
         </FormField>
 
         <FormField label={t.surveys.endDate} htmlFor="surveyEndDate">
-          <Input
+          <DatePicker
             id="surveyEndDate"
-            type="date"
             value={form.endDate}
-            onChange={(event) => updateField('endDate', event.target.value)}
+            onChange={(value) => updateField('endDate', value)}
             disabled={isSaving}
-            dir="ltr"
           />
         </FormField>
 
@@ -384,8 +383,8 @@ function toForm(existing: Survey): SurveyFormState {
     description: persian?.description ?? '',
     descriptionEn: english?.description ?? '',
     estimatedMinutes: String(existing.estimatedMinutes),
-    startDate: existing.startDate ? existing.startDate.slice(0, 10) : '',
-    endDate: existing.endDate ? existing.endDate.slice(0, 10) : '',
+    startDate: isoToLocalDate(existing.startDate),
+    endDate: isoToLocalDate(existing.endDate),
     welcomeMessage: persian?.welcomeMessage ?? '',
     thankYouMessage: persian?.thankYouMessage ?? '',
     isAnonymous: existing.isAnonymous,

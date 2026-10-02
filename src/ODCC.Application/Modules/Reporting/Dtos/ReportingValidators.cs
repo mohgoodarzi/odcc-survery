@@ -36,7 +36,7 @@ public sealed class SaveReportRequestValidator : AbstractValidator<SaveReportReq
         RuleFor(x => x.SurveyId)
             .NotEmpty()
             .When(x => x.Type == ReportType.SurveyAnalytics || x.Type == ReportType.BenchmarkComparison)
-            .WithMessage("برای گزارش تحلیلات یا مقایسه‌ی بنچمارک، انتخاب نظرسنجی الزامی است.");
+            .WithMessage("برای گزارش تحلیل ها یا مقایسه‌ی بنچمارک، انتخاب نظرسنجی الزامی است.");
 
         // خلاصه‌ی داشبورد کل شرکت است و به نظرسنجی خاصی وابسته نیست.
         RuleFor(x => x.SurveyId)

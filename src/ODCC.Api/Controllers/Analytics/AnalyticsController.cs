@@ -60,7 +60,7 @@ public sealed class AnalyticsController(
         {
             return NotFound(new ProblemDetails
             {
-                Title = "تحلیلات این نظرسنجی در دسترس نیست",
+                Title = "تحلیل ها این نظرسنجی در دسترس نیست",
                 Status = StatusCodes.Status404NotFound,
                 Detail = result.Error.Message,
                 Extensions = { ["code"] = result.Error.Code }
@@ -107,7 +107,7 @@ public sealed class AnalyticsController(
 
             return BadRequest(new ProblemDetails
             {
-                Title = "محاسبه‌ی تحلیلات ناموفق بود",
+                Title = "محاسبه‌ی تحلیل ها ناموفق بود",
                 Status = StatusCodes.Status400BadRequest,
                 Detail = result.Error.Message,
                 Extensions = { ["code"] = result.Error.Code }

@@ -973,7 +973,7 @@ public sealed class ActionManagementService(
         {
             Title = request.SuggestedTitle.Trim(),
             Description = $"شاخص {metricLabel} نظرسنجی «{surveyTitle}» با مقدار {request.MetricValue} " +
-                $"از هدف {request.TargetValue} فاصله دارد. این برنامه به‌صورت خودکار از هشدار تحلیلات ایجاد شده است.",
+                $"از هدف {request.TargetValue} فاصله دارد. این برنامه به‌صورت خودکار از هشدار تحلیل ها ایجاد شده است.",
             Source = ActionSource.AnalyticsAlert,
             SourceKey = sourceKey,
             SurveyId = request.SurveyId,

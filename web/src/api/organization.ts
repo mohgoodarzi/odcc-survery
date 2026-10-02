@@ -233,5 +233,30 @@ export const employeesApi = {
     apiPut<Employee>(culture, `/organization/employees/${id}`, request),
 
   delete: (culture: Culture, id: string) =>
-    apiDelete<void>(culture, `/organization/employees/${id}`)
+    apiDelete<void>(culture, `/organization/employees/${id}`),
+
+  import: (culture: Culture, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return apiRequest<EmployeeImportResult>(culture, '/organization/employees/import', {
+      method: 'POST',
+      body: form
+    });
+  }
+};
+
+export interface EmployeeImportRowResult {
+  rowNumber: number;
+  employeeCode: string;
+  fullName: string;
+  outcome: 'created' | 'skipped' | 'failed';
+  message: string | null;
+}
+
+export interface EmployeeImportResult {
+  totalRows: number;
+  createdCount: number;
+  skippedCount: number;
+  failedCount: number;
+  rows: EmployeeImportRowResult[];
 };

@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
 import { Logo } from '@/components/ui/logo';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { ApiError } from '@/api/client';
 import { FullPageSpinner } from '@/components/ui/spinner';
 
@@ -143,11 +144,14 @@ export function LoginPage() {
               </Button>
             </form>
 
-            <div className="mt-6 flex items-center justify-between text-sm text-muted-foreground">
+            <div className="mt-6 flex items-center justify-between gap-2 text-sm text-muted-foreground">
               <span>{t.auth.securityNote}</span>
-              <Button variant="ghost" size="sm" onClick={toggleCulture}>
-                {culture === 'fa' ? 'English' : 'فارسی'}
-              </Button>
+              <div className="flex items-center gap-1">
+                <ThemeToggle />
+                <Button variant="ghost" size="sm" onClick={toggleCulture}>
+                  {culture === 'fa' ? 'English' : 'فارسی'}
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

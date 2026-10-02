@@ -36,7 +36,7 @@ public sealed class AnalyticsAuditEventListener(
         LogAsync(domainEvent, "compute", domainEvent.MetricId, BuildDescription(domainEvent), "low", ct);
 
     private static string BuildDescription(AnalyticsComputedEvent domainEvent) =>
-        $"محاسبه‌ی تحلیلات نظرسنجی «{domainEvent.SurveyCode}» در بُعد {domainEvent.SegmentType} " +
+        $"محاسبه‌ی تحلیل ها نظرسنجی «{domainEvent.SurveyCode}» در بُعد {domainEvent.SegmentType} " +
         $"با {domainEvent.CompletedSessions} پاسخ ارسال‌شده " +
         $"(NPS: {FormatMetric(domainEvent.NpsScore)}، CSAT: {FormatMetric(domainEvent.CsatScore)}، CES: {FormatMetric(domainEvent.CesScore)})";
 

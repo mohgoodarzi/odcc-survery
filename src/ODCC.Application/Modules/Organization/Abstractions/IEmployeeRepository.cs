@@ -18,6 +18,12 @@ public interface IEmployeeRepository : IRepository<Employee>
     /// </summary>
     Task<IReadOnlyList<Employee>> SearchAsync(EmployeeSearchRequest request, string? pathPrefix, CancellationToken ct = default);
 
+    /// <summary>
+    /// شمارش کل رکوردهای مطابق با همان فیلترهای <see cref="SearchAsync"/>
+    /// (بدون صفحه‌بندی) برای محاسبه‌ی تعداد صفحات سمت کلاینت.
+    /// </summary>
+    Task<int> SearchCountAsync(EmployeeSearchRequest request, string? pathPrefix, CancellationToken ct = default);
+
     Task<int> CountByOrgUnitAsync(Guid orgUnitId, CancellationToken ct = default);
 
     /// <summary>

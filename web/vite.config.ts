@@ -32,5 +32,16 @@ export default defineConfig({
     minify: 'esbuild',
     sourcemap: false,
     chunkSizeWarningLimit: 900
+  },
+  test: {
+    // ????? ???? ?? Node ?????? ??????? ???????????? React ?? jsdom ???? ?????.
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test-setup.ts'],
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    environmentMatchGlobs: [
+      ['src/i18n/**', 'node'],
+      ['src/lib/**', 'node']
+    ]
   }
 });

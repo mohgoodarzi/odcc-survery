@@ -10,10 +10,12 @@ import { useLanguage } from '@/i18n/LanguageProvider';
 import { useUsersSearch } from '@/api/hooks';
 import { useCreateActionItem, useUpdateActionItem } from '@/api/actionsHooks';
 import { Dialog } from '@/components/ui/dialog';
+import { DateTimePicker } from '@/components/ui/date-picker';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { isoToLocalDateTime, localDateTimeToIso } from '@/lib/datetime';
 import { priorityOptions } from './ActionPlanDialog';
 
 interface ActionItemDialogProps {
@@ -86,8 +88,8 @@ export function ActionItemDialog({ open, onClose, planId, existing }: ActionItem
       assigneeUserId: form.assigneeUserId || null,
       priority: form.priority,
       displayOrder: form.displayOrder,
-      dueDate: toIso(form.dueDate),
-      remindAt: toIso(form.remindAt)
+      dueDate: localDateTimeToIso(form.dueDate),
+      remindAt: localDateTimeToIso(form.remindAt)
     };
 
     try {
@@ -209,24 +211,20 @@ export function ActionItemDialog({ open, onClose, planId, existing }: ActionItem
         </FormField>
 
         <FormField label={t.actions.dueDate} htmlFor="itemDueDate">
-          <Input
+          <DateTimePicker
             id="itemDueDate"
-            type="datetime-local"
             value={form.dueDate}
-            onChange={(event) => updateField('dueDate', event.target.value)}
+            onChange={(value) => updateField('dueDate', value)}
             disabled={isSaving}
-            dir="ltr"
           />
         </FormField>
 
         <FormField label={t.actions.remindAt} htmlFor="itemRemindAt" error={errors.remindAt}>
-          <Input
+          <DateTimePicker
             id="itemRemindAt"
-            type="datetime-local"
             value={form.remindAt}
-            onChange={(event) => updateField('remindAt', event.target.value)}
+            onChange={(value) => updateField('remindAt', value)}
             disabled={isSaving}
-            dir="ltr"
           />
         </FormField>
       </form>
@@ -263,22 +261,7 @@ function toForm(existing: ActionItemDto): ItemFormState {
     assigneeUserId: existing.assigneeUserId ?? '',
     priority: existing.priority,
     displayOrder: existing.displayOrder,
-    dueDate: toLocalInputValue(existing.dueDate),
-    remindAt: toLocalInputValue(existing.remindAt)
+    dueDate: isoToLocalDateTime(existing.dueDate),
+    remindAt: isoToLocalDateTime(existing.remindAt)
   };
-}
-
-function toIso(localDateTime: string): string | null {
-  if (!localDateTime) return null;
-  const parsed = new Date(localDateTime);
-  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
-}
-
-function toLocalInputValue(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }

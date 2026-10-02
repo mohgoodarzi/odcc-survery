@@ -769,6 +769,13 @@ public sealed class AnalyticsService(
         var survey = surveys.FirstOrDefault(s => s.Id == surveyId);
         var primary = metrics.FirstOrDefault(m => m.SegmentType == AnalyticsSegment.Survey) ?? metrics[0];
 
+        // جمع زدن شاخص‌ها روی همه‌ی ردیف‌ها باعث دوشمارگری می‌شود چون ردیف‌های
+        // سگمنت OrgUnit/Campaign زیرمجموعه‌ای از سگمنت Survey هستند. فقط ردیف‌های
+        // سگمت Survey ملاک قرار می‌گیرند و در نبود آن، همه‌ی ردیف‌ها.
+        var rollup = metrics.Where(m => m.SegmentType == AnalyticsSegment.Survey).ToList();
+        if (rollup.Count == 0)
+            rollup = metrics.ToList();
+
         return new SurveyMetricSummaryDto
         {
             Id = primary.Id,
@@ -777,27 +784,27 @@ public sealed class AnalyticsService(
             SurveyTitle = primary.SurveyTitle,
             IsAnonymous = primary.IsAnonymous,
             SegmentType = AnalyticsSegment.Survey,
-            TotalSessions = metrics.Sum(m => m.TotalSessions),
-            CompletedSessions = metrics.Sum(m => m.CompletedSessions),
-            CompletionRate = metrics.Sum(m => m.TotalSessions) > 0
-                ? (decimal)metrics.Sum(m => m.CompletedSessions) / metrics.Sum(m => m.TotalSessions) * 100m
+            TotalSessions = rollup.Sum(m => m.TotalSessions),
+            CompletedSessions = rollup.Sum(m => m.CompletedSessions),
+            CompletionRate = rollup.Sum(m => m.TotalSessions) > 0
+                ? (decimal)rollup.Sum(m => m.CompletedSessions) / rollup.Sum(m => m.TotalSessions) * 100m
                 : 0m,
-            NpsScore = metrics.Where(m => m.NpsScore.HasValue).Select(m => m.NpsScore!.Value).ToList() switch
+            NpsScore = rollup.Where(m => m.NpsScore.HasValue).Select(m => m.NpsScore!.Value).ToList() switch
             {
                 { Count: > 0 } list => list.Average(),
                 _ => null
             },
-            CsatScore = metrics.Where(m => m.CsatScore.HasValue).Select(m => m.CsatScore!.Value).ToList() switch
+            CsatScore = rollup.Where(m => m.CsatScore.HasValue).Select(m => m.CsatScore!.Value).ToList() switch
             {
                 { Count: > 0 } list => list.Average(),
                 _ => null
             },
-            CesScore = metrics.Where(m => m.CesScore.HasValue).Select(m => m.CesScore!.Value).ToList() switch
+            CesScore = rollup.Where(m => m.CesScore.HasValue).Select(m => m.CesScore!.Value).ToList() switch
             {
                 { Count: > 0 } list => list.Average(),
                 _ => null
             },
-            AverageRating = metrics.Where(m => m.AverageRating.HasValue).Select(m => m.AverageRating!.Value).ToList() switch
+            AverageRating = rollup.Where(m => m.AverageRating.HasValue).Select(m => m.AverageRating!.Value).ToList() switch
             {
                 { Count: > 0 } list => list.Average(),
                 _ => null

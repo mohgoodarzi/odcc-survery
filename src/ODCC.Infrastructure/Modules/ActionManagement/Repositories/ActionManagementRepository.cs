@@ -329,14 +329,23 @@ public sealed class ActionItemRepository(ActionManagementDbContext dbContext) : 
                     || (i.AssigneeUserId == currentUserId && i.AssigneeUserId != null));
             }
 
-            if (request.OrgUnitId is { } requestedUnit && !scope.IsUnrestricted)
+            if (request.OrgUnitId is { } requestedUnit)
             {
-                // فیلتر صریح کاربر: فقط اگر در دامنه‌ی او باشد.
-                var prefix = scope.VisiblePathPrefix!;
-                query = query.Where(i =>
-                    (i.ActionPlan != null && i.ActionPlan.OrgUnitId == requestedUnit
-                        && i.ActionPlan.OrgUnitPath != null
-                        && i.ActionPlan.OrgUnitPath.StartsWith(prefix)));
+                // فیلتر صریح کاربر: در دامنه‌ی شرکت همه‌ی واحدها قابل‌انتخاب است،
+                // و در دامنه‌ی سازمانی فقط اگر داخل دامنه‌ی قابل‌مشاهده باشد.
+                if (scope.IsUnrestricted)
+                {
+                    query = query.Where(i =>
+                        i.ActionPlan != null && i.ActionPlan.OrgUnitId == requestedUnit);
+                }
+                else
+                {
+                    var prefix = scope.VisiblePathPrefix!;
+                    query = query.Where(i =>
+                        (i.ActionPlan != null && i.ActionPlan.OrgUnitId == requestedUnit
+                            && i.ActionPlan.OrgUnitPath != null
+                            && i.ActionPlan.OrgUnitPath.StartsWith(prefix)));
+                }
             }
         }
         else

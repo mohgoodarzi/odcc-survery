@@ -33,6 +33,14 @@ export const Permissions = {
     Publish: 'surveys.publish',
     Delete: 'surveys.delete'
   },
+  Questionnaire: {
+    View: 'questionnaire.view',
+    Manage: 'questionnaire.manage'
+  },
+  QuestionBank: {
+    View: 'question_bank.view',
+    Manage: 'question_bank.manage'
+  },
   Campaign: {
     View: 'campaigns.view',
     Manage: 'campaigns.manage'

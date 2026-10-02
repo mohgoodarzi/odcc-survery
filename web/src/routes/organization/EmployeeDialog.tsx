@@ -7,10 +7,12 @@ import {
 import { ApiError } from '@/api/client';
 import { useLanguage } from '@/i18n/LanguageProvider';
 import { useEmployee, useManagerOptions, useOrgUnits, usePositions } from '@/api/hooks';import { Dialog } from '@/components/ui/dialog';
+import { DatePicker } from '@/components/ui/date-picker';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { isoToLocalDate, todayLocalDate } from '@/lib/datetime';
 
 interface EmployeeDialogProps {
   open: boolean;
@@ -51,8 +53,8 @@ export function EmployeeDialog({ open, onClose, employeeId }: EmployeeDialogProp
             positionId: existingEmployee.positionId ?? '',
             managerId: existingEmployee.managerId ?? '',
             status: String(existingEmployee.status),
-            startDate: existingEmployee.startDate,
-            endDate: existingEmployee.endDate ?? '',
+            startDate: isoToLocalDate(existingEmployee.startDate),
+            endDate: isoToLocalDate(existingEmployee.endDate),
             workEmail: existingEmployee.workEmail ?? '',
             internalPhone: existingEmployee.internalPhone ?? ''
           }
@@ -341,11 +343,10 @@ export function EmployeeDialog({ open, onClose, employeeId }: EmployeeDialogProp
           required
           error={errors.startDate}
         >
-          <Input
+          <DatePicker
             id="employeeStartDate"
-            type="date"
             value={form.startDate}
-            onChange={(event) => updateField('startDate', event.target.value)}
+            onChange={(value) => updateField('startDate', value)}
             disabled={isSaving}
           />
         </FormField>
@@ -356,11 +357,10 @@ export function EmployeeDialog({ open, onClose, employeeId }: EmployeeDialogProp
           error={errors.endDate}
           hint={t.common.optional}
         >
-          <Input
+          <DatePicker
             id="employeeEndDate"
-            type="date"
             value={form.endDate}
-            onChange={(event) => updateField('endDate', event.target.value)}
+            onChange={(value) => updateField('endDate', value)}
             disabled={isSaving}
           />
         </FormField>
@@ -421,7 +421,7 @@ function createEmptyForm(): EmployeeFormState {
     positionId: '',
     managerId: '',
     status: String(EmployeeStatus.Active),
-    startDate: new Date().toISOString().slice(0, 10),
+    startDate: todayLocalDate(),
     endDate: '',
     workEmail: '',
     internalPhone: ''

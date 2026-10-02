@@ -210,7 +210,17 @@ public sealed class ReportExecutionRepository(ReportingDbContext dbContext) : IR
     private IQueryable<ReportExecution> BuildSearchQuery(
         ExecutionSearchRequest request, IReadOnlyCollection<Guid>? visibleDefinitionIds = null)
     {
-        var query = _dbContext.ReportExecutions.AsNoTracking();
+        // فیلتر سراسری حذف نرم نادیده گرفته می‌شود تا IncludeArchived بتواند
+        // اجراهای بایگانی‌شده را نشان دهد. فیلتر «غیر بایگانی‌شده» در زیر
+        // به‌صورت صریح و کنترل‌شده اعمال می‌شود.
+        var query = _dbContext.ReportExecutions
+            .AsNoTracking()
+            .IgnoreQueryFilters();
+
+        if (!request.IncludeArchived)
+        {
+            query = query.Where(e => !e.IsDeleted);
+        }
 
         // مرز سازمانی (fail-closed): لیست خالی یعنی هیچ اجرایی قابل‌مشاهده نیست.
         // null یعنی کاربر دامنه‌ی Company دارد (نامحدود).

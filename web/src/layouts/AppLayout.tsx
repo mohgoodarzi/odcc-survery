@@ -4,7 +4,7 @@ import {
   LayoutDashboard, FileText, Megaphone, BarChart3, FileBarChart, Settings, Languages,
   Users, ShieldCheck, Building2, Briefcase, UserCircle, LogOut, ChevronDown,
   LayoutTemplate, ClipboardCheck, MessageSquareText, ClipboardList, Workflow,
-  GitBranch, CheckCircle, Plug, Send, SlidersHorizontal, Flag, ScrollText
+  GitBranch, CheckCircle, Plug, Send, SlidersHorizontal, Flag, ScrollText, ListChecks
 } from 'lucide-react';
 
 import { useAuth } from '@/auth/AuthProvider';
@@ -14,6 +14,7 @@ import { useClickOutside } from '@/lib/use-click-outside';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/ui/logo';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 
 interface NavItem {
   to: string;
@@ -48,6 +49,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
       label: t.surveys.templatesTitle,
       icon: LayoutTemplate,
       permissions: [Permissions.Survey.View]
+    },
+    {
+      to: `/${culture}/questionnaires`,
+      label: t.nav.questionnaires,
+      icon: ListChecks,
+      permissions: [Permissions.Questionnaire.View]
     },
     { to: `/${culture}/campaigns`, label: t.nav.campaigns, icon: Megaphone, permissions: [Permissions.Campaign.View] },
     { to: `/${culture}/my-surveys`, label: t.nav.mySurveys, icon: ClipboardCheck },
@@ -159,7 +166,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
       icon: ShieldCheck,
       permissions: [Permissions.Identity.RolesView]
     },
-    { to: `/${culture}/settings`, label: t.nav.settings, icon: Settings }
+    {
+      to: `/${culture}/settings`,
+      label: t.nav.settings,
+      icon: Settings,
+      permissions: [Permissions.System.View]
+    }
   ];
   const visibleNavItems = navItems.filter(
     (item) => !item.permissions || hasAnyPermission(...item.permissions)
@@ -224,6 +236,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <Button variant="ghost" size="icon" onClick={toggleCulture} aria-label={t.common.language}>
               <Languages className="size-4" />
             </Button>
+
+            <ThemeToggle />
 
             {user && (
               <UserMenu

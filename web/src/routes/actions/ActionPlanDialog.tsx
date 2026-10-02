@@ -10,11 +10,13 @@ import { useLanguage } from '@/i18n/LanguageProvider';
 import { useCampaignableSurveys, useOrgUnits, useUsersSearch } from '@/api/hooks';
 import { useCreateActionPlan, useUpdateActionPlan } from '@/api/actionsHooks';
 import { Dialog } from '@/components/ui/dialog';
+import { DateTimePicker } from '@/components/ui/date-picker';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
+import { isoToLocalDateTime, localDateTimeToIso } from '@/lib/datetime';
 
 interface ActionPlanDialogProps {
   open: boolean;
@@ -90,7 +92,7 @@ export function ActionPlanDialog({ open, onClose, planId, existing }: ActionPlan
       orgUnitId: form.orgUnitId || null,
       ownerUserId: form.ownerUserId || null,
       priority: form.priority,
-      dueDate: toIso(form.dueDate),
+      dueDate: localDateTimeToIso(form.dueDate),
       activateImmediately: form.activateImmediately
     };
 
@@ -234,13 +236,11 @@ export function ActionPlanDialog({ open, onClose, planId, existing }: ActionPlan
         </FormField>
 
         <FormField label={t.actions.dueDate} htmlFor="planDueDate" error={errors.dueDate}>
-          <Input
+          <DateTimePicker
             id="planDueDate"
-            type="datetime-local"
             value={form.dueDate}
-            onChange={(event) => updateField('dueDate', event.target.value)}
+            onChange={(value) => updateField('dueDate', value)}
             disabled={isSaving}
-            dir="ltr"
           />
         </FormField>
 
@@ -294,30 +294,11 @@ function toForm(existing: ActionPlanDto): PlanFormState {
     orgUnitId: existing.orgUnitId ?? '',
     ownerUserId: existing.ownerUserId ?? '',
     priority: existing.priority,
-    dueDate: toLocalInputValue(existing.dueDate),
+    dueDate: isoToLocalDateTime(existing.dueDate),
     // پرچم فعال‌سازی بر اساس وضعیت فعلی پر می‌شود تا ویرایش، برنامه‌ی فعال را
     // به پیش‌نویس برگرداند یا برعکس.
     activateImmediately: existing.status === 1
   };
-}
-
-/**
- * تبدیل مقدار ورودی datetime-local (زمان محلی) به ISO 8601 با منطقه‌ی UTC.
- */
-function toIso(localDateTime: string): string | null {
-  if (!localDateTime) return null;
-  const parsed = new Date(localDateTime);
-  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
-}
-
-/** تبدیل ISO 8601 سرور به مقدار ورودی datetime-local (زمان محلی). */
-function toLocalInputValue(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 export function priorityOptions(t: import('@/i18n/types').Dictionary['actions']) {

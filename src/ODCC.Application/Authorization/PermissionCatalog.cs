@@ -95,7 +95,7 @@ public static class PermissionCatalog
         new()
         {
             GroupKey = nameof(Permissions.Analytics),
-            DisplayName = "تحلیلات",
+            DisplayName = "تحلیل ها",
             Permissions = [
                 Permissions.Analytics.View,
                 Permissions.Analytics.DepartmentView,

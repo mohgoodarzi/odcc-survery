@@ -26,8 +26,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { EmptyState, ErrorState, TableLoading } from '@/components/ui/states';
 import { Pagination } from '@/routes/identity/UsersPage';
 import { Dialog } from '@/components/ui/dialog';
+import { DateTimePicker } from '@/components/ui/date-picker';
 import { FormField } from '@/components/ui/form-field';
 import { formatDateTime } from '@/i18n/format';
+import { isoToLocalDateTime } from '@/lib/datetime';
 import type { Dictionary } from '@/i18n/types';
 
 /**
@@ -530,13 +532,11 @@ function FeatureFlagDialog({
         )}
 
         <FormField label={t.system.expiresAt} htmlFor="flagExpiresAt">
-          <Input
+          <DateTimePicker
             id="flagExpiresAt"
-            type="datetime-local"
             value={form.expiresAtRaw}
-            onChange={(event) => updateField('expiresAtRaw', event.target.value)}
+            onChange={(value) => updateField('expiresAtRaw', value)}
             disabled={isSaving}
-            dir="ltr"
           />
         </FormField>
       </form>
@@ -577,7 +577,7 @@ function toForm(existing: FeatureFlagDto): FlagFormState {
     percentage: existing.percentage || 0,
     allowedUsersRaw: existing.allowedUserIds.join(', '),
     allowedRolesRaw: existing.allowedRoles.join(', '),
-    expiresAtRaw: toLocalInputValue(existing.expiresAt)
+    expiresAtRaw: isoToLocalDateTime(existing.expiresAt)
   };
 }
 
@@ -586,16 +586,6 @@ function splitList(value: string): string[] {
     .split(',')
     .map((part) => part.trim())
     .filter(Boolean);
-}
-
-/** تبدیل ISO 8601 سرور به مقدار ورودی datetime-local (زمان محلی). */
-function toLocalInputValue(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function flagStateOptions(t: Dictionary) {

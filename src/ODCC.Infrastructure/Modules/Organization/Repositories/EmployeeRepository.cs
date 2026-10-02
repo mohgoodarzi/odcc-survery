@@ -45,6 +45,38 @@ public sealed class EmployeeRepository(OrganizationDbContext dbContext) : IEmplo
         string? pathPrefix,
         CancellationToken ct = default)
     {
+        var query = await BuildSearchQueryAsync(request, pathPrefix, ct);
+        if (query is null)
+        {
+            return [];
+        }
+
+        return await query
+            .OrderBy(e => e.LastName).ThenBy(e => e.FirstName)
+            .Skip((Math.Max(request.Page, 1) - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .ToListAsync(ct);
+    }
+
+    public async Task<int> SearchCountAsync(
+        EmployeeSearchRequest request,
+        string? pathPrefix,
+        CancellationToken ct = default)
+    {
+        var query = await BuildSearchQueryAsync(request, pathPrefix, ct);
+        return query is null ? 0 : await query.CountAsync(ct);
+    }
+
+    /// <summary>
+    /// ساخت کوئری مشترک جستجو (متن، واحد سازمانی با زیردرخت، وضعیت) که هم
+    /// صفحه‌ی جاری و هم شمارش کل از همان فیلترها استفاده کنند.
+    /// اگر واحد داده‌شده وجود نداشته باشد، <c>null</c> برمی‌گرداند (نتیجه‌ی خالی).
+    /// </summary>
+    private async Task<IQueryable<Employee>?> BuildSearchQueryAsync(
+        EmployeeSearchRequest request,
+        string? pathPrefix,
+        CancellationToken ct = default)
+    {
         var query = _dbContext.Employees.AsNoTracking();
 
         if (!string.IsNullOrWhiteSpace(request.SearchText))
@@ -74,7 +106,7 @@ public sealed class EmployeeRepository(OrganizationDbContext dbContext) : IEmplo
                 // مسیر یافت نشد → واحد وجود ندارد → نتیجه‌ی خالی.
                 if (string.IsNullOrEmpty(prefix))
                 {
-                    return [];
+                    return null;
                 }
 
                 // محدودسازی زیردرخت با پیشوند مسیر مادی.
@@ -97,13 +129,7 @@ public sealed class EmployeeRepository(OrganizationDbContext dbContext) : IEmplo
             query = query.Where(e => e.Status == status);
         }
 
-        var employees = await query
-            .OrderBy(e => e.LastName).ThenBy(e => e.FirstName)
-            .Skip((Math.Max(request.Page, 1) - 1) * request.PageSize)
-            .Take(request.PageSize)
-            .ToListAsync(ct);
-
-        return employees;
+        return query;
     }
 
     public Task<int> CountByOrgUnitAsync(Guid orgUnitId, CancellationToken ct = default) =>

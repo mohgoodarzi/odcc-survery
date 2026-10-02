@@ -9,7 +9,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select } from '@/components/ui/select';
 import { EmptyState, ErrorState, TableLoading } from '@/components/ui/states';
-import { formatCount, formatNumber } from '@/i18n/format';
+import { formatCount, formatNumber, formatPeriodLabel, formatPeriodTick } from '@/i18n/format';
 import { MetricCard } from './MetricCard';
 
 /**
@@ -108,14 +108,14 @@ export function AnalyticsDashboardPage() {
                         <div
                           key={point.periodLabel}
                           className="group relative flex flex-1 flex-col items-center justify-end"
-                          title={`${point.periodLabel}: ${formatCount(point.count, culture)}`}
+                          title={`${formatPeriodLabel(point.periodLabel, culture)}: ${formatCount(point.count, culture)}`}
                         >
                           <div
                             className="w-full rounded-t bg-primary/70 transition-all group-hover:bg-primary"
                             style={{ height: `${height}%` }}
                           />
                           <span className="mt-1 hidden text-[10px] text-muted-foreground sm:inline">
-                            {point.periodLabel.slice(5)}
+                            {formatPeriodTick(point.periodLabel, culture)}
                           </span>
                         </div>
                       );

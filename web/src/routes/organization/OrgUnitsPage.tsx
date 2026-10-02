@@ -26,7 +26,11 @@ export function OrgUnitsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  // درخت به‌صورت پیش‌فرض کاملاً باز است تا همه‌ی واحدها (شامل فرزندان) در
+  // صفحه‌ی مدیریت دیده شوند — همان واحدهایی که در dropdown فرم کارمند
+  // دیده می‌شوند. کاربر می‌تواند شاخه‌ها را با همین دکمه جمع کند.
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const { data: tree, isLoading, isError, error, refetch } = useOrgUnitTree();
   const deleteMutation = useDeleteOrgUnit();
@@ -34,7 +38,7 @@ export function OrgUnitsPage() {
   const canManage = hasPermission(Permissions.Organization.UnitsManage);
 
   function toggleExpanded(id: string) {
-    setExpanded((previous) => {
+    setCollapsed((previous) => {
       const next = new Set(previous);
       if (next.has(id)) {
         next.delete(id);
@@ -88,7 +92,7 @@ export function OrgUnitsPage() {
                 key={node.id}
                 node={node}
                 level={0}
-                expanded={expanded}
+                collapsed={collapsed}
                 onToggleExpanded={toggleExpanded}
                 canManage={canManage}
                 onEdit={(id) => setEditingId(id)}
@@ -128,7 +132,7 @@ export function OrgUnitsPage() {
 interface OrgUnitNodeProps {
   node: OrgUnitTreeNode;
   level: number;
-  expanded: Set<string>;
+  collapsed: Set<string>;
   onToggleExpanded: (id: string) => void;
   canManage: boolean;
   onEdit: (id: string) => void;
@@ -138,7 +142,7 @@ interface OrgUnitNodeProps {
 function OrgUnitNode({
   node,
   level,
-  expanded,
+  collapsed,
   onToggleExpanded,
   canManage,
   onEdit,
@@ -146,7 +150,7 @@ function OrgUnitNode({
 }: OrgUnitNodeProps) {
   const { t } = useLanguage();
   const hasChildren = node.children.length > 0;
-  const isExpanded = expanded.has(node.id);
+  const isExpanded = !collapsed.has(node.id);
 
   return (
     <div className="flex flex-col">
@@ -222,7 +226,7 @@ function OrgUnitNode({
               key={child.id}
               node={child}
               level={level + 1}
-              expanded={expanded}
+              collapsed={collapsed}
               onToggleExpanded={onToggleExpanded}
               canManage={canManage}
               onEdit={onEdit}

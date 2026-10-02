@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Users, Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { Users, Plus, Pencil, Trash2, Search, FileSpreadsheet } from 'lucide-react';
 
 import { ApiError } from '@/api/client';
 import { EmployeeStatus } from '@/api/organization';
@@ -20,6 +20,7 @@ import { EmptyState, ErrorState, TableLoading } from '@/components/ui/states';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Pagination } from '@/routes/identity/UsersPage';
 import { EmployeeDialog } from './EmployeeDialog';
+import { EmployeeImportDialog } from './EmployeeImportDialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 /**
@@ -36,6 +37,7 @@ export function EmployeesPage() {
   const [page, setPage] = useState(1);
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -96,10 +98,16 @@ export function EmployeesPage() {
         description={t.employees.description}
         actions={
           canManage ? (
-            <Button onClick={() => setCreateOpen(true)}>
-              <Plus className="size-4" />
-              {t.employees.newEmployee}
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setImportOpen(true)}>
+                <FileSpreadsheet className="size-4" />
+                {t.employees.importButton}
+              </Button>
+              <Button onClick={() => setCreateOpen(true)}>
+                <Plus className="size-4" />
+                {t.employees.newEmployee}
+              </Button>
+            </div>
           ) : undefined
         }
       />
@@ -256,6 +264,10 @@ export function EmployeesPage() {
       )}
 
       {createOpen && <EmployeeDialog open={createOpen} onClose={() => setCreateOpen(false)} />}
+
+      {importOpen && (
+        <EmployeeImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
+      )}
 
       {editingId && (
         <EmployeeDialog open={!!editingId} onClose={() => setEditingId(null)} employeeId={editingId} />

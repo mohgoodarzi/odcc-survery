@@ -421,6 +421,76 @@ public class ReportingServiceTests
     }
 
     [Fact]
+    public async Task GetData_Returns_Sections_For_Display()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        env.SetCurrentUser(orgUnitId: null, DataScope.Company);
+        var surveyId = await SeedSurveyAsync(env);
+
+        var service = env.Services.GetRequiredService<IReportingService>();
+
+        var created = await service.CreateAsync(new SaveReportRequest
+        {
+            Name = "گزارش نمایش",
+            Type = ReportType.SurveyAnalytics,
+            SurveyId = surveyId
+        });
+
+        var data = await service.GetDataAsync(created.Value!.Id);
+
+        data.IsSuccess.Should().BeTrue();
+        data.Value!.Title.Should().Be("گزارش نمایش");
+        data.Value.Sections.Should().NotBeEmpty();
+
+        // بخش شاخص‌های کلیدی باید ستون‌ها و ردیف‌های هم‌اندازه داشته باشد.
+        var metrics = data.Value.Sections.First(s => s.Columns.Count == 2);
+        metrics.Columns.Should().HaveCount(2);
+        metrics.Rows.Should().NotBeEmpty();
+        metrics.Rows.Should().AllSatisfy(row => row.Should().HaveCount(2));
+    }
+
+    [Fact]
+    public async Task GetData_Matches_Rendered_Artifact()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        env.SetCurrentUser(orgUnitId: null, DataScope.Company);
+        var surveyId = await SeedSurveyAsync(env);
+
+        var service = env.Services.GetRequiredService<IReportingService>();
+
+        var created = await service.CreateAsync(new SaveReportRequest
+        {
+            Name = "گزارش هم‌خوان",
+            Type = ReportType.SurveyAnalytics,
+            SurveyId = surveyId
+        });
+
+        var executed = await service.ExecuteAsync(created.Value!.Id);
+        executed.IsSuccess.Should().BeTrue();
+
+        var data = await service.GetDataAsync(created.Value!.Id);
+
+        // داده‌ی روی صفحه باید همان تعداد ردیفی را داشته که در فایل نوشته شده.
+        data.IsSuccess.Should().BeTrue();
+        data.Value!.Sections.Sum(s => s.Rows.Count).Should().Be(executed.Value!.RowCount);
+    }
+
+    [Fact]
+    public async Task GetData_Of_Report_Outside_Scope_Is_Denied()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        var (reportId, visibleUnitId) = await SeedReportOutsideScopeAsync(env);
+        env.SetCurrentUser(visibleUnitId, DataScope.Department);
+
+        var service = env.Services.GetRequiredService<IReportingService>();
+
+        var result = await service.GetDataAsync(reportId);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("report_not_found");
+    }
+
+    [Fact]
     public async Task Execute_Of_Archived_Definition_Is_Rejected()
     {
         await using var env = await TestEnvironment.CreateAsync();

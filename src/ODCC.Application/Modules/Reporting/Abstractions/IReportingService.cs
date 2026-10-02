@@ -60,6 +60,15 @@ public interface IReportingService
     Task<Result<ReportArtifact>> GetArtifactAsync(Guid executionId, CancellationToken ct = default);
 
     /// <summary>
+    /// دریافت داده‌ی نمایش‌گرای یک تعریف گزارش (بخش‌ها، ستون‌ها و ردیف‌ها).
+    ///
+    /// این همان داده‌ای است که رندر فایل خروجی از آن ساخته می‌شود، بنابراین
+    /// جدول روی صفحه با فایل قابل‌دانلود یکسان خواهد بود. مرز سازمانی
+    /// (fail-closed) اعمال می‌شود و خروجی فقط تجمع‌های تحلیلی است.
+    /// </summary>
+    Task<Result<ReportDataBundleDto>> GetDataAsync(Guid reportDefinitionId, CancellationToken ct = default);
+
+    /// <summary>
     /// پردازش تعاریف زمان‌بندی‌شده‌ای که زمان اجرایشان رسیده. این متد توسط
     /// زمان‌بند پس‌زمینه فراخوانی می‌شود و در خارج آن نباید استفاده شود.
     /// </summary>
