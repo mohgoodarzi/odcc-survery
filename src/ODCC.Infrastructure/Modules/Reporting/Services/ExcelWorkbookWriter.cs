@@ -38,6 +38,11 @@ public static class ExcelWorkbookWriter
         var sharedStrings = new List<string>();
         var stringIndex = new Dictionary<string, int>(StringComparer.Ordinal);
 
+        // تعداد کل ارجاع‌های سلول‌های رشته‌ای در کل کارتاب (مجموع سرستون‌ها و
+        // داده‌ها). ویژگی <c>count</c> در sharedStrings باید این مقدار باشد، نه
+        // تعداد رشته‌های یکتا (<c>uniqueCount</c>).
+        var totalStringReferences = 0;
+
         using var archive = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true);
 
         WriteEntry(archive, "[Content_Types].xml", ContentTypesXml(sheetNames.Count));
@@ -49,10 +54,10 @@ public static class ExcelWorkbookWriter
         for (var i = 0; i < sections.Count; i++)
         {
             var sheet = $"xl/worksheets/sheet{i + 1}.xml";
-            WriteEntry(archive, sheet, SheetXml(sections[i], i + 1, sharedStrings, stringIndex));
+            WriteEntry(archive, sheet, SheetXml(sections[i], i + 1, sharedStrings, stringIndex, ref totalStringReferences));
         }
 
-        WriteEntry(archive, "xl/sharedStrings.xml", SharedStringsXml(sharedStrings));
+        WriteEntry(archive, "xl/sharedStrings.xml", SharedStringsXml(sharedStrings, totalStringReferences));
 
         return rowCount;
     }
@@ -190,20 +195,20 @@ public static class ExcelWorkbookWriter
         "<styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">" +
         "<fonts count=\"2\">" +
         "<font><sz val=\"11\"/><name val=\"Calibri\"/></font>" +
-        "<font><b/><sz val=\"11\"/><color val=\"FFFFFFFF\"/><name val=\"Calibri\"/></font>" +
+        "<font><b/><sz val=\"11\"/><color rgb=\"FFFFFFFF\"/><name val=\"Calibri\"/></font>" +
         "</fonts>" +
         "<fills count=\"3\">" +
         "<fill><patternFill patternType=\"none\"/></fill>" +
         "<fill><patternFill patternType=\"gray125\"/></fill>" +
-        "<fill><patternFill patternType=\"solid\"><fgColor val=\"FF2F4F6F\"/><bgColor val=\"FF2F4F6F\"/></patternFill></fill>" +
+        "<fill><patternFill patternType=\"solid\"><fgColor rgb=\"FF2F4F6F\"/><bgColor rgb=\"FF2F4F6F\"/></patternFill></fill>" +
         "</fills>" +
         "<borders count=\"2\">" +
         "<border/>" +
         "<border>" +
-        "<left style=\"thin\"><color val=\"FFBFBFBF\"/></left>" +
-        "<right style=\"thin\"><color val=\"FFBFBFBF\"/></right>" +
-        "<top style=\"thin\"><color val=\"FFBFBFBF\"/></top>" +
-        "<bottom style=\"thin\"><color val=\"FFBFBFBF\"/></bottom>" +
+        "<left style=\"thin\"><color rgb=\"FFBFBFBF\"/></left>" +
+        "<right style=\"thin\"><color rgb=\"FFBFBFBF\"/></right>" +
+        "<top style=\"thin\"><color rgb=\"FFBFBFBF\"/></top>" +
+        "<bottom style=\"thin\"><color rgb=\"FFBFBFBF\"/></bottom>" +
         "</border>" +
         "</borders>" +
         "<cellStyleXfs count=\"1\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellStyleXfs>" +
@@ -222,11 +227,28 @@ public static class ExcelWorkbookWriter
         ReportSection section,
         int sheetId,
         List<string> sharedStrings,
-        Dictionary<string, int> stringIndex)
+        Dictionary<string, int> stringIndex,
+        ref int totalStringReferences)
     {
         var builder = new StringBuilder();
         builder.Append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
         builder.Append("<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">");
+
+        // ترتیب عناصر طبق طرح‌واره‌ی ECMA-376 (CT_Worksheet) الزامی است:
+        // sheetPr، dimension، sheetViews، sheetFormatPr، cols، sheetData، ...
+        // اگر ترتیب رعایت نشود، Excel فایل را خراب گزارش می‌کند. در گذشته
+        // cols قبل از sheetViews نوشته می‌شد که نامعتبر بود.
+
+        // محدوده‌ی سلول‌های استفاده‌شده (برای نمایش سریع و سازگاری با
+        // ابزارهایی مثل LibreOffice که به آن وابسته‌اند).
+        var lastColumn = section.Columns.Count > 0 ? ColumnLetter(section.Columns.Count - 1) : "A";
+        var lastRow = Math.Max(1, section.Rows.Count + 1);
+        builder.Append(CultureInfo.InvariantCulture, $"<dimension ref=\"A1:{lastColumn}{lastRow}\"/>");
+
+        // راست‌به‌چپ برای فارسی.
+        builder.Append("<sheetViews><sheetView workbookViewId=\"0\" rightToLeft=\"1\">");
+        builder.Append(CultureInfo.InvariantCulture, $"<pane ySplit=\"1\" topLeftCell=\"A2\" activePane=\"bottomLeft\" state=\"frozen\"/>");
+        builder.Append("</sheetView></sheetViews>");
 
         // عرض ستون‌ها از پهنای پیشنهادی ستون‌ها.
         builder.Append("<cols>");
@@ -238,11 +260,6 @@ public static class ExcelWorkbookWriter
 
         builder.Append("</cols>");
 
-        // راست‌به‌چپ برای فارسی.
-        builder.Append("<sheetViews><sheetView workbookViewId=\"0\" rightToLeft=\"1\">");
-        builder.Append(CultureInfo.InvariantCulture, $"<pane ySplit=\"1\" topLeftCell=\"A2\" activePane=\"bottomLeft\" state=\"frozen\"/>");
-        builder.Append("</sheetView></sheetViews>");
-
         builder.Append("<sheetData>");
 
         // ردیف سرستون.
@@ -251,7 +268,7 @@ public static class ExcelWorkbookWriter
         {
             // عنوان سرستون مستقیماً به‌صورت رشته‌ی مشترک نوشته می‌شود (نه
             // اندیسِ آن) تا مسیر Cell با مجموعه‌های نامعتفر مواجه نشود.
-            builder.Append(Cell('A', c, 1, section.Columns[c].Title, column: null, sharedStrings, stringIndex, styleIndex: 1));
+            builder.Append(Cell('A', c, 1, section.Columns[c].Title, ref totalStringReferences, null, sharedStrings, stringIndex, 1));
         }
 
         builder.Append("</row>");
@@ -264,7 +281,7 @@ public static class ExcelWorkbookWriter
 
             for (var c = 0; c < section.Columns.Count && c < row.Count; c++)
             {
-                builder.Append(Cell('A', c, r + 2, row[c], section.Columns[c], sharedStrings, stringIndex));
+                builder.Append(Cell('A', c, r + 2, row[c], ref totalStringReferences, section.Columns[c], sharedStrings, stringIndex));
             }
 
             builder.Append("</row>");
@@ -287,6 +304,7 @@ public static class ExcelWorkbookWriter
         int columnIndex,
         int rowIndex,
         object? value,
+        ref int totalStringReferences,
         ReportColumn? column = null,
         List<string>? sharedStrings = null,
         Dictionary<string, int>? stringIndex = null,
@@ -300,6 +318,7 @@ public static class ExcelWorkbookWriter
                 return $"<c r=\"{reference}\" s=\"{styleIndex}\"/>";
 
             case string text:
+                totalStringReferences++;
                 return $"<c r=\"{reference}\" s=\"{styleIndex}\" t=\"s\">" +
                        $"<v>{SharedString(text, sharedStrings!, stringIndex!)}</v></c>";
 
@@ -325,6 +344,7 @@ public static class ExcelWorkbookWriter
                 return NumberCell(reference, number, column);
 
             default:
+                totalStringReferences++;
                 return $"<c r=\"{reference}\" s=\"{styleIndex}\" t=\"s\">" +
                        $"<v>{SharedString(value.ToString() ?? string.Empty, sharedStrings!, stringIndex!)}</v></c>";
         }
@@ -359,12 +379,12 @@ public static class ExcelWorkbookWriter
         return index.ToString(CultureInfo.InvariantCulture);
     }
 
-    private static string SharedStringsXml(List<string> sharedStrings)
+    private static string SharedStringsXml(List<string> sharedStrings, int totalStringReferences)
     {
         var builder = new StringBuilder();
         builder.Append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
         builder.Append("<sst xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"");
-        builder.Append(CultureInfo.InvariantCulture, $" count=\"{sharedStrings.Count}\" uniqueCount=\"{sharedStrings.Count}\">");
+        builder.Append(CultureInfo.InvariantCulture, $" count=\"{totalStringReferences}\" uniqueCount=\"{sharedStrings.Count}\">");
 
         foreach (var text in sharedStrings)
         {

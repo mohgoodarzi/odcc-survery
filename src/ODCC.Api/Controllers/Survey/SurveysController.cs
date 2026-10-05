@@ -76,7 +76,8 @@ public sealed class SurveysController(ISurveyService surveyService) : Controller
         return CreatedAtAction(nameof(GetById), new { id = result.GetValueOrThrow().Id, culture = RouteData.Values["culture"] }, result.GetValueOrThrow());
     }
 
-    /// <summary>به‌روزرسانی تنظیمات نظرسنجی (فقط در حالت پیش‌نویس).</summary>
+    /// <summary>به‌روزرسانی تنظیمات نظرسنجی. فیلدهای ساختاری فقط در حالت پیش‌نویس قابل تغییرند؛
+    /// در سایر وضعیت‌های قابل‌ویرایش تنها متن‌ها، تاریخ پایان و تنظیمات نمایش به‌روز می‌شوند.</summary>
     [HttpPut("{id:guid}")]
     [HasPermission(Permissions.Survey.Edit)]
     [ProducesResponseType(typeof(SurveyDto), StatusCodes.Status200OK)]

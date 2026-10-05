@@ -191,6 +191,13 @@ public sealed class DataSeeder(
     /// ایجاد کاربر مدیر کل در صورت نبودن.
     /// رمز عبور باید از پیکربندی تامین شده باشد؛ در غیر این صورت، ایجاد کاربر
     /// به‌صورت ایمن رد می‌شود (با هشدار) تا برنامه بوت شود.
+    ///
+    /// <b>تعمیر خودتوان:</b> اگر کاربر مدیر کلِ موجود دامنه‌ی <see cref="DataScope.Own"/>
+    /// داشته باشد، به <see cref="DataScope.Company"/> بازگردانده می‌شود. دامنه‌ی Own
+    /// باعث می‌شود <c>OrgScopeProvider</c> دامنه‌ای خالی برگرداند و همه‌ی ماژول‌های
+    /// سازمانی (گزارش‌ها، کارمندان، واحدها، …) نتیجه‌ی خالی برگردانند؛ یعنی مدیر
+    /// سامانه دیگر هیچ داده‌ای نمی‌بیند. این گام فقط همین حالتِ شکسته را اصلاح
+    /// می‌کند و هرگز دامنه‌ی دیگری (مثلاً Department) را بازنویسی نمی‌کند.
     /// </summary>
     private async Task SeedAdminUserAsync(Guid? rootOrgUnitId, CancellationToken ct)
     {
@@ -199,6 +206,20 @@ public sealed class DataSeeder(
             var existing = await userManager.FindByNameAsync(_options.AdminUserName);
             if (existing is not null)
             {
+                // فقط دامنه‌ی Own (حالت شکسته) اصلاح می‌شود؛ سایر دامنه‌ها دست‌نخورده می‌مانند.
+                if (existing.DataScope == DataScope.Own)
+                {
+                    existing.DataScope = DataScope.Company;
+                    existing.UpdatedAt = DateTime.UtcNow;
+
+                    var fixResult = await userManager.UpdateAsync(existing);
+                    if (!fixResult.Succeeded)
+                    {
+                        SeedFailed(logger, nameof(SeedAdminUserAsync),
+                            new InvalidOperationException(string.Join(", ", fixResult.Errors.Select(e => e.Description))));
+                    }
+                }
+
                 return;
             }
 

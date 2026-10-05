@@ -1,8 +1,10 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using ODCC.Application.Abstractions;
 using ODCC.Application.Authorization;
+using ODCC.Application.Modules.FileStorage.Abstractions;
 using ODCC.Application.Modules.Identity.Abstractions;
 using ODCC.Application.Modules.Identity.Dtos;
 using ODCC.Domain.Common;
@@ -19,12 +21,39 @@ public sealed class UserService(
     UserManager<ApplicationUser> userManager,
     RoleManager<ApplicationRole> roleManager,
     IRefreshTokenStore refreshTokenStore,
+    IFileStorage fileStorage,
+    IOptions<FileStorageOptions> fileStorageOptions,
     IdentityDbContext identityDbContext) : IUserService
 {
     private readonly UserManager<ApplicationUser> _userManager = userManager;
     private readonly RoleManager<ApplicationRole> _roleManager = roleManager;
     private readonly IRefreshTokenStore _refreshTokenStore = refreshTokenStore;
+    private readonly IFileStorage _fileStorage = fileStorage;
+    private readonly FileStorageOptions _fileStorageOptions = fileStorageOptions.Value;
     private readonly IdentityDbContext _identityDbContext = identityDbContext;
+
+    /// <summary>شاخه‌ی منطقی انبار فایل برای تصاویر آواتار.</summary>
+    private const string AvatarBucket = "avatars";
+
+    /// <summary>حداکثر اندازه‌ی تصویر آواتار (مگابایت).</summary>
+    private const int MaxAvatarSizeMb = 5;
+
+    private static readonly long MaxAvatarBytes = MaxAvatarSizeMb * 1024L * 1024L;
+
+    /// <summary>پسوندهای تصویری مجاز برای آواتار (deny-by-default).</summary>
+    private static readonly HashSet<string> AllowedAvatarExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "png", "jpg", "jpeg", "gif", "webp"
+    };
+
+    /// <summary>امضای (magic bytes) انواع تصویر مجاز برای تأیید اینکه محتوا واقعاً تصویر است.</summary>
+    private static readonly Dictionary<string, byte[]> ImageSignatures = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["png"] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A],
+        ["jpg"] = [0xFF, 0xD8, 0xFF],
+        ["jpeg"] = [0xFF, 0xD8, 0xFF],
+        ["gif"] = [0x47, 0x49, 0x46, 0x38] // «GIF8»
+    };
 
     public async Task<Result<PagedResult<UserSummaryDto>>> SearchAsync(UserSearchRequest request, CancellationToken ct = default)
     {
@@ -282,7 +311,7 @@ public sealed class UserService(
             FirstName = user.FirstName,
             LastName = user.LastName,
             DisplayName = user.DisplayName,
-            AvatarUrl = user.AvatarUrl,
+            AvatarUrl = AvatarUrlBuilder.Build(user.Id, user.AvatarUrl),
             IsActive = user.IsActive,
             EmailConfirmed = user.EmailConfirmed,
             TwoFactorEnabled = user.TwoFactorEnabled,
@@ -291,6 +320,226 @@ public sealed class UserService(
             Roles = roles.AsReadOnly(),
             Permissions = permissions
         });
+    }
+
+    /// <summary>
+    /// بارگذاری (یا تعویض) تصویر آواتار. تصویر اعتبارسنجی می‌شود، در انبار
+    /// فایل‌ها با نامی تصادفی ذخیره می‌شود و مسیر آن در پایگاه داده می‌ماند.
+    /// </summary>
+    public async Task<Result<UserSummaryDto>> SetAvatarAsync(
+        Guid userId, Stream content, string fileName, string contentType, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user is null || user.IsDeleted)
+        {
+            return Result.Failure<UserSummaryDto>("user_not_found", "کاربر یافت نشد.");
+        }
+
+        if (content.Length <= 0)
+        {
+            return Result.Failure<UserSummaryDto>("avatar_empty", "فایل تصویر خالی است.");
+        }
+
+        if (content.Length > MaxAvatarBytes)
+        {
+            return Result.Failure<UserSummaryDto>("avatar_too_large",
+                $"اندازه‌ی تصویر نباید بیشتر از {MaxAvatarSizeMb} مگابایت باشد.");
+        }
+
+        var extension = ExtractImageExtension(fileName);
+        if (extension is null)
+        {
+            return Result.Failure<UserSummaryDto>("avatar_invalid_type",
+                "تنها تصاویر PNG، JPEG، GIF یا WebP قابل بارگذاری هستند.");
+        }
+
+        // نوع محتوای اعلام‌شده توسط مرورگر باید تصویر باشد (لایه‌ی اول دفاع).
+        if (!string.IsNullOrWhiteSpace(contentType)
+            && !contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            return Result.Failure<UserSummaryDto>("avatar_invalid_type",
+                "تنها تصاویر PNG، JPEG، GIF یا WebP قابل بارگذاری هستند.");
+        }
+
+        // محتوا در حافظه‌ی موقت کپی می‌شود تا بتوان امضای فایل را بررسی کرد
+        // و سپس دقیقاً همان بایت‌ها در انبار ذخیره شوند.
+        await using var buffered = new MemoryStream();
+        await content.CopyToAsync(buffered, ct);
+
+        if (!IsValidImageSignature(buffered, extension))
+        {
+            return Result.Failure<UserSummaryDto>("avatar_invalid_type",
+                "محتوای فایل تصویر معتبر نیست یا با پسوند آن همخوانی ندارد.");
+        }
+
+        buffered.Position = 0;
+
+        StoredFile stored;
+
+        try
+        {
+            stored = await _fileStorage.SaveAsync(buffered, extension, AvatarBucket, ct);
+        }
+        catch (Exception)
+        {
+            return Result.Failure<UserSummaryDto>("avatar_upload_failed", "ذخیره‌ی تصویر آواتار ناموفق بود.");
+        }
+
+        var previousPath = user.AvatarUrl;
+
+        user.AvatarUrl = stored.RelativePath;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        var updateResult = await _userManager.UpdateAsync(user);
+        if (!updateResult.Succeeded)
+        {
+            // پایگاه داده به‌روز نشد؛ فایل تازه‌نوشته‌شده پاک می‌شود تا یتیم نماند.
+            await DeleteAvatarFileAsync(stored.RelativePath, ct);
+
+            return Result.Failure<UserSummaryDto>("avatar_upload_failed", "ذخیره‌ی تصویر آواتار ناموفق بود.");
+        }
+
+        // تصویر قبلی دیگر مورد نیاز نیست؛ بهترین‌حالت حذف می‌شود.
+        await DeleteAvatarFileAsync(previousPath, ct);
+
+        var roles = await _userManager.GetRolesAsync(user);
+        return Result.Success(ToSummary(user, roles.AsReadOnly()));
+    }
+
+    /// <summary>حذف تصویر آواتار کاربر.</summary>
+    public async Task<Result> RemoveAvatarAsync(Guid userId, CancellationToken ct = default)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user is null || user.IsDeleted)
+        {
+            return Result.Failure("user_not_found", "کاربر یافت نشد.");
+        }
+
+        var previousPath = user.AvatarUrl;
+
+        user.AvatarUrl = null;
+        user.UpdatedAt = DateTime.UtcNow;
+        await _userManager.UpdateAsync(user);
+
+        await DeleteAvatarFileAsync(previousPath, ct);
+
+        return Result.Success();
+    }
+
+    /// <summary>باز کردن تصویر آواتار کاربر برای خواندن.</summary>
+    public async Task<Result<AvatarFileDto>> OpenAvatarAsync(Guid userId, CancellationToken ct = default)
+    {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+        if (user is null || user.IsDeleted)
+        {
+            return Result.Failure<AvatarFileDto>("user_not_found", "کاربر یافت نشد.");
+        }
+
+        if (string.IsNullOrWhiteSpace(user.AvatarUrl) || !_fileStorage.Exists(user.AvatarUrl))
+        {
+            return Result.Failure<AvatarFileDto>("avatar_not_found", "تصویر آواتار یافت نشد.");
+        }
+
+        var stream = await _fileStorage.OpenReadAsync(user.AvatarUrl, ct);
+
+        var contentType = _fileStorageOptions.ContentTypeMapping.TryGetValue(
+            ExtractImageExtension(user.AvatarUrl) ?? string.Empty, out var mapped)
+                ? mapped
+                : "application/octet-stream";
+
+        return Result.Success(new AvatarFileDto(stream, contentType, stream.Length));
+    }
+
+    /// <summary>حذف بهترین‌حالت فایل آواتار از انبار؛ خطا نباید عملیات اصلی را لغو کند.</summary>
+    private async Task DeleteAvatarFileAsync(string? relativePath, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath))
+        {
+            return;
+        }
+
+        try
+        {
+            await _fileStorage.DeleteAsync(relativePath, ct);
+        }
+        catch
+        {
+            // فایل ممکن است قبلاً حذف شده باشد یا در دسترس نباشد.
+        }
+    }
+
+    /// <summary>استخراج پسوند تصویری مجاز از نام فایل (بدون نقطه و کوچک).</summary>
+    private static string? ExtractImageExtension(string? fileName)
+    {
+        string? extension;
+
+        try
+        {
+            extension = Path.GetExtension(fileName)?.TrimStart('.').ToLowerInvariant();
+        }
+        catch
+        {
+            return null;
+        }
+
+        return !string.IsNullOrEmpty(extension) && AllowedAvatarExtensions.Contains(extension)
+            ? extension
+            : null;
+    }
+
+    /// <summary>
+    /// تطبیق امضای (magic bytes) فایل با نوع تصویر اعلام‌شده. این بررسی در کنار
+    /// پسوند و نوع محتوا، لایه‌ی سوم دفاع در برابر بارگذاری محتوای غیرتصویری است.
+    /// </summary>
+    private static bool IsValidImageSignature(Stream content, string extension)
+    {
+        // WebP یک کانتینر RIFF است: «RIFF» + ۴ بایت اندازه + «WEBP».
+        var isWebp = string.Equals(extension, "webp", StringComparison.OrdinalIgnoreCase);
+
+        var signature = isWebp
+            ? new byte[] { 0x52, 0x49, 0x46, 0x46 } // «RIFF»
+            : ImageSignatures.TryGetValue(extension, out var known) ? known : null;
+
+        if (signature is null)
+        {
+            return false;
+        }
+
+        // سرصفندهای طولانی‌تر از امضا (مثل ۱۲ بایت WebP) خوانده می‌شوند.
+        var headerLength = Math.Max(signature.Length, isWebp ? 12 : 0);
+
+        content.Position = 0;
+
+        var header = new byte[headerLength];
+        var read = content.Read(header, 0, headerLength);
+
+        content.Position = 0;
+
+        if (read < signature.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < signature.Length; i++)
+        {
+            if (header[i] != signature[i])
+            {
+                return false;
+            }
+        }
+
+        if (isWebp)
+        {
+            return read >= 12
+                && header[8] == 0x57  // W
+                && header[9] == 0x45  // E
+                && header[10] == 0x42 // B
+                && header[11] == 0x50; // P
+        }
+
+        return true;
     }
 
     /// <summary>انتصاب نقش‌ها به کاربر (جایگزینی کامل).</summary>
@@ -341,9 +590,11 @@ public sealed class UserService(
         FirstName = user.FirstName,
         LastName = user.LastName,
         DisplayName = user.DisplayName,
+        AvatarUrl = AvatarUrlBuilder.Build(user.Id, user.AvatarUrl),
         IsActive = user.IsActive,
         EmailConfirmed = user.EmailConfirmed,
         OrgUnitId = user.OrgUnitId,
+        DataScope = user.DataScope,
         CreatedAt = user.CreatedAt,
         Roles = roles
     };

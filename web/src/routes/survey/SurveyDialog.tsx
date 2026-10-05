@@ -1,10 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { surveysApi, Language, type SaveSurveyRequest, type Survey, type SurveyLocalization } from '@/api/surveys';
+import { surveysApi, Language, SurveyStatus, type SaveSurveyRequest, type Survey, type SurveyLocalization } from '@/api/surveys';
 import { ApiError } from '@/api/client';
 import { useLanguage } from '@/i18n/LanguageProvider';
-import { queryKeys, useCreateSurvey, useQuestionnaires, useSurvey, useUpdateSurvey } from '@/api/hooks';
+import { queryKeys, useCreateSurvey, useQuestionnaire, useQuestionnaires, useSurvey, useUpdateSurvey } from '@/api/hooks';
 import { Dialog } from '@/components/ui/dialog';
 import { DatePicker } from '@/components/ui/date-picker';
 import { FormField } from '@/components/ui/form-field';
@@ -18,6 +18,8 @@ interface SurveyDialogProps {
   open: boolean;
   onClose: () => void;
   surveyId?: string | null;
+  /** پس از ذخیره‌ی موفق، با پیام مناسب برای نمایش روی صفحه فراخوانی می‌شود. */
+  onSaved?: (message: string) => void;
 }
 
 /**
@@ -25,8 +27,13 @@ interface SurveyDialogProps {
  *
  * فهرست نظرسنجی‌ها در کوئری «surveys» نگهداری می‌شود و دیالوگ برای
  * پیش‌بندی ویرایش، مدخل نظرسنجی جاری را از همان کش می‌خواند.
+ *
+ * **فیلدهای قفل‌شده:** پس از انتشار، فیلدهای ساختاری (کد، پرسشنامه، ناشناس
+ * بودن، تک‌پاسخی و تاریخ شروع) غیرفعال می‌شوند تا یکپارچگی پاسخ‌های
+ * جمع‌آوری‌شده و قرارداد حریم خصوصی تغییر نکند. فقط متن‌های نمایشی، تاریخ
+ * پایان و تنظیمات نمایش قابل ویرایش می‌مانند.
  */
-export function SurveyDialog({ open, onClose, surveyId }: SurveyDialogProps) {
+export function SurveyDialog({ open, onClose, surveyId, onSaved }: SurveyDialogProps) {
   const { t, culture } = useLanguage();
   const isEdit = !!surveyId;
 
@@ -35,7 +42,14 @@ export function SurveyDialog({ open, onClose, surveyId }: SurveyDialogProps) {
   // خواندن نظرسنجی کامل برای پیش‌بندی فرم ویرایش (خلاصه فهرست همه‌ی فیلدها را ندارد).
   const { data: existing } = useSurvey(surveyId ?? null);
 
+  // پرسشنامه‌ی فعلیِ نظرسنجی ممکن است دیگر «فعال» نباشد (مثلاً بایگانی شده
+  // باشد). عنوان آن بارگذاری می‌شود تا بتوانیم همان گزینه را به فهرست
+  // گزینه‌ها اضافه کنیم و فیلد پرسشنامه خالی نمایش داده نشود.
+  const { data: currentQuestionnaire } = useQuestionnaire(existing?.questionnaireId ?? null);
+
   const queryClient = useQueryClient();
+
+  const isPublished = isEdit && existing !== undefined && existing.status !== SurveyStatus.Draft;
 
   const [form, setForm] = useState(() => createEmptyForm());
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -116,8 +130,10 @@ export function SurveyDialog({ open, onClose, surveyId }: SurveyDialogProps) {
     try {
       if (isEdit && surveyId) {
         await surveysApi.update(culture, surveyId, request);
+        onSaved?.(t.surveys.surveyUpdated);
       } else {
         await surveysApi.create(culture, request);
+        onSaved?.(t.surveys.surveyCreated);
       }
 
       await queryClient.invalidateQueries({ queryKey: queryKeys.surveys });
@@ -143,6 +159,17 @@ export function SurveyDialog({ open, onClose, surveyId }: SurveyDialogProps) {
     value: questionnaire.id,
     label: `${questionnaire.title} (${questionnaire.code})`
   }));
+
+  // فهرست گزینه‌ها فقط پرسشنامه‌های «فعال» را می‌آورد تا انتخاب یک پرسشنامه‌ی
+  // غیرقابل‌استفاده ممکن نباشد. اما پرسشنامه‌ی فعلیِ نظرسنجی باید همیشه در
+  // فهرست باشد، حتی اگر بایگانی شده باشد؛ در غیر این صورت فیلد پر نمی‌شود و
+  // به نظر می‌رسد نظرسنجی پرسشنامه‌ای ندارد.
+  if (currentQuestionnaire && !questionnaireOptions.some((option) => option.value === currentQuestionnaire.id)) {
+    questionnaireOptions.push({
+      value: currentQuestionnaire.id,
+      label: `${currentQuestionnaire.title} (${currentQuestionnaire.code})`
+    });
+  }
 
   return (
     <Dialog
@@ -172,12 +199,24 @@ export function SurveyDialog({ open, onClose, surveyId }: SurveyDialogProps) {
           </div>
         )}
 
-        <FormField label={t.surveys.code} htmlFor="surveyCode" required error={errors.code}>
+        {isPublished && (
+          <div className="col-span-full rounded-md border border-primary/30 bg-primary/5 p-3 text-xs text-foreground">
+            {t.surveys.publishedSurveyEditHint}
+          </div>
+        )}
+
+        <FormField
+          label={t.surveys.code}
+          htmlFor="surveyCode"
+          required
+          error={errors.code}
+          hint={isPublished ? t.surveys.lockedFieldHint : undefined}
+        >
           <Input
             id="surveyCode"
             value={form.code}
             onChange={(event) => updateField('code', event.target.value)}
-            disabled={isSaving}
+            disabled={isSaving || isPublished}
             dir="ltr"
           />
         </FormField>
@@ -187,7 +226,13 @@ export function SurveyDialog({ open, onClose, surveyId }: SurveyDialogProps) {
           htmlFor="surveyQuestionnaire"
           required
           error={errors.questionnaireId}
-          hint={questionnaireOptions.length === 0 ? t.surveys.noActiveQuestionnaires : undefined}
+          hint={
+            isPublished
+              ? t.surveys.lockedFieldHint
+              : questionnaireOptions.length === 0
+                ? t.surveys.noActiveQuestionnaires
+                : undefined
+          }
         >
           <Select
             id="surveyQuestionnaire"
@@ -195,7 +240,7 @@ export function SurveyDialog({ open, onClose, surveyId }: SurveyDialogProps) {
             onChange={(event) => updateField('questionnaireId', event.target.value)}
             options={questionnaireOptions}
             placeholder={t.surveys.selectQuestionnaire}
-            disabled={isSaving}
+            disabled={isSaving || isPublished}
           />
         </FormField>
 
@@ -244,12 +289,16 @@ export function SurveyDialog({ open, onClose, surveyId }: SurveyDialogProps) {
           />
         </FormField>
 
-        <FormField label={t.surveys.startDate} htmlFor="surveyStartDate">
+        <FormField
+          label={t.surveys.startDate}
+          htmlFor="surveyStartDate"
+          hint={isPublished ? t.surveys.lockedFieldHint : undefined}
+        >
           <DatePicker
             id="surveyStartDate"
             value={form.startDate}
             onChange={(value) => updateField('startDate', value)}
-            disabled={isSaving}
+            disabled={isSaving || isPublished}
           />
         </FormField>
 
@@ -284,8 +333,8 @@ export function SurveyDialog({ open, onClose, surveyId }: SurveyDialogProps) {
           checked={form.isAnonymous}
           onChange={(checked) => updateField('isAnonymous', checked)}
           label={t.surveys.isAnonymous}
-          hint={t.surveys.isAnonymousHint}
-          disabled={isSaving}
+          hint={isPublished ? t.surveys.lockedFieldHint : t.surveys.isAnonymousHint}
+          disabled={isSaving || isPublished}
         />
 
         <SettingsCheckbox
@@ -306,7 +355,8 @@ export function SurveyDialog({ open, onClose, surveyId }: SurveyDialogProps) {
           checked={form.singleResponsePerUser}
           onChange={(checked) => updateField('singleResponsePerUser', checked)}
           label={t.surveys.singleResponsePerUser}
-          disabled={isSaving}
+          hint={isPublished ? t.surveys.lockedFieldHint : undefined}
+          disabled={isSaving || isPublished}
         />
       </form>
     </Dialog>

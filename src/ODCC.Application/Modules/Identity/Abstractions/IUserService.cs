@@ -36,4 +36,24 @@ public interface IUserService
 
     /// <summary>دریافت پروفایل کامل کاربر احراز هویت‌شده.</summary>
     Task<Result<UserProfileDto>> GetProfileAsync(Guid userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// بارگذاری (یا تعویض) تصویر آواتار کاربر. نوع و اندازه‌ی تصویر
+    /// اعتبارسنجی می‌شود و محتوا در انبار فایل‌ها (بیرون از پایگاه داده)
+    /// ذخیره می‌شود؛ فقط مسیر آن در پایگاه داده می‌ماند.
+    /// </summary>
+    /// <param name="userId">شناسه‌ی کاربر.</param>
+    /// <param name="content">محتوای فایل تصویر.</param>
+    /// <param name="fileName">نام اصلی فایل (فقط برای استخراج پسوند استفاده می‌شود).</param>
+    /// <param name="contentType">نوع محتوای اعلام‌شده توسط کلاینت.</param>
+    /// <param name="ct">توکن لغو.</param>
+    Task<Result<UserSummaryDto>> SetAvatarAsync(
+        Guid userId, Stream content, string fileName, string contentType, CancellationToken ct = default);
+
+    /// <summary>حذف تصویر آواتار کاربر.</summary>
+    Task<Result> RemoveAvatarAsync(Guid userId, CancellationToken ct = default);
+
+    /// <summary>باز کردن تصویر آواتار کاربر برای خواندن.</summary>
+    Task<Result<AvatarFileDto>> OpenAvatarAsync(Guid userId, CancellationToken ct = default);
 }
+

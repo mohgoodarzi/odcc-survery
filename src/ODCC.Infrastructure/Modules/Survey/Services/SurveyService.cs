@@ -123,6 +123,17 @@ public sealed class SurveyService(
         return Result.Success(ToDto(survey));
     }
 
+    /// <summary>
+    /// به‌روزرسانی تنظیمات نظرسنجی.
+    ///
+    /// **قانون ویرایش بر اساس وضعیت:** نظرسنجی‌های بسته یا بایگانی‌شده به‌هیچ‌وجه
+    /// قابل ویرایش نیستند (تاریخچه‌ی پاسخ‌ها باید دست‌نخورده بماند). در سایر
+    /// وضعیت‌ها (پیش‌نویس، زمان‌بندی‌شده، فعال، متوقف) only فیلدهای «امن»
+    /// (متن‌های نمایشی، تاریخ پایان، مدت تخمینی و تنظیمات نمایش) به‌روزرسانی
+    /// می‌شوند. تغییر فیلدهای ساختاری (کد، پرسشنامه، ناشناس بودن، تک‌پاسخی و
+    /// تاریخ شروع) فقط در حالت پیش‌نویس مجاز است؛ در غیر این صورت مقدار موجود
+    /// حفظ می‌شود تا یکپارچگی پاسخ‌های جمع‌آوری‌شده (و قرارداد حریم خصوصی) تغییر نکند.
+    /// </summary>
     public async Task<Result<SurveyDto>> UpdateAsync(Guid id, SaveSurveyRequest request, CancellationToken ct = default)
     {
         var survey = await _surveyRepository.GetByIdAsync(id, ct);
@@ -131,38 +142,45 @@ public sealed class SurveyService(
             return Result.Failure<SurveyDto>("survey_not_found", "نظرسنجی یافت نشد.");
         }
 
-        // نظرسنجی منتشرشده قابل ویرایش نیست: پاسخ‌های احتمالی به ساختار فعلی وابسته‌اند.
-        if (survey.Status != SurveyStatus.Draft)
+        // نظرسنجی بسته/بایگانی‌شده قابل ویرایش نیست: پاسخ‌های ثبت‌شده باید دست‌نخورده باقی بمانند.
+        if (survey.Status is SurveyStatus.Closed or SurveyStatus.Archived)
         {
-            return Result.Failure<SurveyDto>("survey_is_not_draft", "تنها نظرسنجی‌های پیش‌نویس قابل ویرایش هستند.");
+            return Result.Failure<SurveyDto>("survey_is_not_editable", "این نظرسنجی در وضعیت فعلی قابل ویرایش نیست.");
         }
 
-        var questionnaire = await LoadActiveQuestionnaireAsync(request.QuestionnaireId, ct);
-        if (questionnaire is null)
+        // فقط در حالت پیش‌نویس، فیلدهای ساختاری قابل تغییر هستند.
+        if (survey.Status == SurveyStatus.Draft)
         {
-            return Result.Failure<SurveyDto>("questionnaire_not_active", "پرسشنامه‌ی ارجاع‌شده وجود ندارد یا فعال نیست.");
-        }
-
-        if (!string.Equals(survey.Code, request.Code, StringComparison.Ordinal))
-        {
-            var codeError = await CheckCodeAsync(request.Code, id, ct);
-            if (codeError is not null)
+            var questionnaire = await LoadActiveQuestionnaireAsync(request.QuestionnaireId, ct);
+            if (questionnaire is null)
             {
-                return Result.Failure<SurveyDto>(codeError.Value.Code, codeError.Value.Message);
+                return Result.Failure<SurveyDto>("questionnaire_not_active", "پرسشنامه‌ی ارجاع‌شده وجود ندارد یا فعال نیست.");
             }
+
+            if (!string.Equals(survey.Code, request.Code, StringComparison.Ordinal))
+            {
+                var codeError = await CheckCodeAsync(request.Code, id, ct);
+                if (codeError is not null)
+                {
+                    return Result.Failure<SurveyDto>(codeError.Value.Code, codeError.Value.Message);
+                }
+            }
+
+            survey.Code = request.Code;
+            survey.QuestionnaireId = questionnaire.Id;
+            survey.QuestionnaireVersion = questionnaire.Version;
+            survey.QuestionnaireCode = questionnaire.Code;
+            survey.IsAnonymous = request.IsAnonymous;
+            survey.SingleResponsePerUser = request.SingleResponsePerUser;
+            survey.StartDate = request.StartDate;
         }
 
-        survey.Code = request.Code;
-        survey.QuestionnaireId = questionnaire.Id;
-        survey.QuestionnaireVersion = questionnaire.Version;
-        survey.QuestionnaireCode = questionnaire.Code;
-        survey.IsAnonymous = request.IsAnonymous;
-        survey.AllowEditResponse = request.AllowEditResponse;
-        survey.ShowProgressBar = request.ShowProgressBar;
-        survey.SingleResponsePerUser = request.SingleResponsePerUser;
-        survey.StartDate = request.StartDate;
+        // فیلدهای امن برای هر وضعیتِ قابل‌ویرایش: متن‌های نمایشی پاسخ‌دهنده،
+        // تاریخ پایان پنجره‌ی پاسخ‌گویی، مدت زمان تخمینی و تنظیمات نمایش.
         survey.EndDate = request.EndDate;
         survey.EstimatedMinutes = request.EstimatedMinutes;
+        survey.AllowEditResponse = request.AllowEditResponse;
+        survey.ShowProgressBar = request.ShowProgressBar;
 
         ApplyLocalizations(survey, request.Localizations);
 

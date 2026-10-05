@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ClipboardList, Plus, Pencil, Trash2, Search, MoreVertical } from 'lucide-react';
+import { ClipboardList, Plus, Pencil, Trash2, Search, MoreVertical, X } from 'lucide-react';
 
 import { ApiError } from '@/api/client';
 import { SurveyStatus } from '@/api/surveys';
@@ -47,6 +47,7 @@ export function SurveysPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [lifecycleTarget, setLifecycleTarget] = useState<{ id: string; action: SurveyAction } | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const {
     data,
@@ -70,6 +71,14 @@ export function SurveysPage() {
   const canEdit = hasPermission(Permissions.Survey.Edit);
   const canPublish = hasPermission(Permissions.Survey.Publish);
   const canDelete = hasPermission(Permissions.Survey.Delete);
+
+  /**
+   * نظرسنجی‌های بسته/بایگانی‌شده قابل ویرایش نیستند؛ بقیه وضعیت‌ها هستند.
+   * (قانون یکسان سمت سرور در <c>SurveyService.UpdateAsync</c>.)
+   */
+  function isSurveyEditable(status: SurveyStatus): boolean {
+    return status !== SurveyStatus.Closed && status !== SurveyStatus.Archived;
+  }
 
   function handleSearch(value: string) {
     setSearchText(value || null);
@@ -113,6 +122,22 @@ export function SurveysPage() {
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
+        {successMessage && (
+          <div
+            className="flex basis-full items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm"
+            role="status"
+          >
+            <span>{successMessage}</span>
+            <button
+              type="button"
+              onClick={() => setSuccessMessage(null)}
+              aria-label={t.common.close}
+              className="text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        )}
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -193,12 +218,13 @@ export function SurveysPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
-                      {canEdit && survey.status === SurveyStatus.Draft && (
+                      {canEdit && isSurveyEditable(survey.status) && (
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => setEditingId(survey.id)}
                           aria-label={t.common.edit}
+                          title={t.common.edit}
                         >
                           <Pencil className="size-4" />
                         </Button>
@@ -241,10 +267,17 @@ export function SurveysPage() {
         <Pagination page={page} totalPages={totalPages} totalCount={totalCount} onPageChange={setPage} />
       )}
 
-      {createOpen && <SurveyDialog open={createOpen} onClose={() => setCreateOpen(false)} />}
+      {createOpen && (
+        <SurveyDialog open={createOpen} onClose={() => setCreateOpen(false)} onSaved={setSuccessMessage} />
+      )}
 
       {editingId && (
-        <SurveyDialog open={!!editingId} onClose={() => setEditingId(null)} surveyId={editingId} />
+        <SurveyDialog
+          open={!!editingId}
+          onClose={() => setEditingId(null)}
+          surveyId={editingId}
+          onSaved={setSuccessMessage}
+        />
       )}
 
       <ConfirmDialog

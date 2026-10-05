@@ -36,3 +36,8 @@ TestResults/
 
 # Doc-generation scratch dir (intermediate PDF/HTML parts, debug files, runtime tokens)
 .docgen/
+
+# Local reproduction/debug scratch scripts (contain dev credentials; never commit)
+.repro*.ps1
+.repro-*.png
+.repro-*.txt

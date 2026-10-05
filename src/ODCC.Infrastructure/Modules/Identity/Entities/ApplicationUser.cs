@@ -26,7 +26,12 @@ public class ApplicationUser : IdentityUser<Guid>
     /// <summary>کد ملی (اختیاری).</summary>
     public string? NationalCode { get; set; }
 
-    /// <summary>آدرس تصویر آواتار (اختیاری).</summary>
+    /// <summary>
+    /// مسیر نسبی تصویر آواتار در انبار فایل‌ها (مثلاً «avatars/2026-10/….png»).
+    ///
+    /// این مقدار آدرس عمومی نیست — نشانی قابل‌استفاده برای کلاینت در لایه‌ی
+    /// نمایش (AvatarUrlBuilder) از روی این مسیر و شناسه‌ی کاربر ساخته می‌شود.
+    /// </summary>
     public string? AvatarUrl { get; set; }
 
     /// <summary>آیا حساب کاربری فعال است؟ حساب غیرفعال نمی‌تواند وارد شود.</summary>

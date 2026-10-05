@@ -12,6 +12,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { AvatarUploader } from '@/components/ui/avatar-upload';
 import { AppLayout } from '@/layouts/AppLayout';
 
 /**
@@ -20,6 +21,21 @@ import { AppLayout } from '@/layouts/AppLayout';
 export function ProfilePage() {
   const { t, culture } = useLanguage();
   const { user, refreshUser } = useAuth();
+
+  const uploadAvatarMutation = useMutation({
+    mutationFn: (file: File) => usersApi.uploadMyAvatar(culture, file),
+    onSuccess: async () => {
+      // پروفایل به‌روز می‌شود تا آواتار نوار بالا هم عوض شود.
+      await refreshUser();
+    }
+  });
+
+  const removeAvatarMutation = useMutation({
+    mutationFn: () => usersApi.deleteMyAvatar(culture),
+    onSuccess: async () => {
+      await refreshUser();
+    }
+  });
 
   if (!user) {
     return null;
@@ -36,7 +52,14 @@ export function ProfilePage() {
             <CardDescription>{user.displayName}</CardDescription>
           </CardHeader>
 
-          <CardContent className="flex flex-col gap-3">
+          <CardContent className="flex flex-col gap-4">
+            <AvatarUploader
+              avatarUrl={user.avatarUrl}
+              displayName={user.displayName}
+              onUpload={(file) => uploadAvatarMutation.mutateAsync(file)}
+              onRemove={removeAvatarMutation.mutateAsync}
+            />
+
             <InfoRow
               icon={<Mail className="size-4" />}
               label={t.users.email}

@@ -11,13 +11,30 @@ public sealed record UserSummaryDto
     public string FirstName { get; init; } = string.Empty;
     public string LastName { get; init; } = string.Empty;
     public string DisplayName { get; init; } = string.Empty;
+
+    /// <summary>نشانی‌ی عمومی تصویر آواتار یا <c>null</c> اگر تصویری وجود ندارد.</summary>
+    public string? AvatarUrl { get; init; }
+
     public bool IsActive { get; init; }
     public bool EmailConfirmed { get; init; }
     public Guid? OrgUnitId { get; init; }
     public string? OrgUnitName { get; init; }
+
+    /// <summary>
+    /// دامنه‌ی دسترسی کاربر به داده‌های سازمانی. کلاینت برای حفظ مقدار فعلی در
+    /// هنگام ویرایش کاربر به این فیلد نیاز دارد (در غیر این صورت ممکن است
+    /// دامنه به‌طور ناخواسته به <c>Own</c> بازنشانی شود).
+    /// </summary>
+    public ODCC.Domain.Common.DataScope DataScope { get; init; }
+
     public DateTimeOffset CreatedAt { get; init; }
     public IReadOnlyCollection<string> Roles { get; init; } = [];
 }
+
+/// <summary>
+/// محتوای فایل تصویر آواتار برای دانلود (استریم + نوع محتوا).
+/// </summary>
+public sealed record AvatarFileDto(Stream Content, string ContentType, long Length);
 
 /// <summary>
 /// درخواست ایجاد کاربر.
@@ -33,9 +50,6 @@ public sealed record CreateUserRequest
 
     /// <summary>کد ملی (اختیاری، دقیقاً ۱۰ رقم).</summary>
     public string? NationalCode { get; init; }
-
-    /// <summary>تصویر آواتار کاربر (اختیاری).</summary>
-    public string? AvatarUrl { get; init; }
 
     public Guid? OrgUnitId { get; init; }
     public ODCC.Domain.Common.DataScope DataScope { get; init; }

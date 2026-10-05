@@ -1,6 +1,8 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using ODCC.Application.Modules.Analytics.Abstractions;
+using ODCC.Application.Modules.Analytics.Dtos;
 using ODCC.Application.Modules.Audit.Abstractions;
 using ODCC.Application.Modules.Audit.Dtos;
 using ODCC.Application.Modules.QuestionBank.Abstractions;
@@ -12,10 +14,12 @@ using ODCC.Application.Modules.Reporting.Dtos;
 using ODCC.Application.Modules.Survey.Abstractions;
 using ODCC.Application.Modules.Survey.Dtos;
 using ODCC.Domain.Common;
+using ODCC.Domain.Modules.Analytics.Enums;
 using ODCC.Domain.Modules.QuestionBank.Enums;
 using ODCC.Domain.Modules.Reporting.Entities;
 using ODCC.Domain.Modules.Reporting.Enums;
 using ODCC.Infrastructure.Modules.Reporting.Persistence;
+using System.Text;
 using Xunit;
 
 namespace ODCC.Infrastructure.Tests.Modules.Reporting;
@@ -399,8 +403,14 @@ public class ReportingServiceTests
         bytes[1].Should().Be(0x4B); // 'K'
     }
 
-    [Fact]
-    public async Task Execute_Dashboard_Summary_Without_Survey_Works()
+    /// <summary>
+    /// گزارش خلاصه‌ی داشبورد به نظرسنجی خاصی وابسته نیست و در هر دو قالب
+    /// باید اجرا و خروجی تولید کند.
+    /// </summary>
+    [Theory]
+    [InlineData(ReportFormat.Pdf)]
+    [InlineData(ReportFormat.Excel)]
+    public async Task Execute_Dashboard_Summary_Produces_Artifact_In_Both_Formats(ReportFormat format)
     {
         await using var env = await TestEnvironment.CreateAsync();
         env.SetCurrentUser(orgUnitId: null, DataScope.Company);
@@ -411,13 +421,19 @@ public class ReportingServiceTests
         {
             Name = "خلاصه‌ی داشبورد",
             Type = ReportType.DashboardSummary,
-            Format = ReportFormat.Pdf
+            Format = format
         });
 
         var executed = await service.ExecuteAsync(created.Value!.Id);
 
         executed.IsSuccess.Should().BeTrue();
         executed.Value!.Status.Should().Be(ReportExecutionStatus.Succeeded);
+        executed.Value.HasArtifact.Should().BeTrue();
+        executed.Value.Format.Should().Be(format);
+
+        // دانلود خروجی باید موفق باشد.
+        var artifact = await service.GetArtifactAsync(executed.Value.Id);
+        artifact.IsSuccess.Should().BeTrue();
     }
 
     [Fact]
@@ -535,6 +551,80 @@ public class ReportingServiceTests
 
         executed.IsSuccess.Should().BeTrue();
         executed.Value!.Status.Should().Be(ReportExecutionStatus.Succeeded);
+    }
+
+    /// <summary>
+    /// اجرای کامل یک گزارش «مقایسه با بنچمارک» وقتی بنچمارک واقعی تعریف شده
+    /// است. بخش بنچمارک شش ستونِ پهن دارد که قبلاً در PDF باعث
+    /// <c>DocumentLayoutException</c> می‌شد. این آزمون هر دو قالب را از طریق
+    /// کل مسیر (ایجاد ← اجرا ← دانلود خروجی) بررسی می‌کند.
+    /// </summary>
+    [Theory]
+    [InlineData(ReportFormat.Pdf)]
+    [InlineData(ReportFormat.Excel)]
+    public async Task Execute_Benchmark_Comparison_With_Benchmark_Produces_Artifact(ReportFormat format)
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        env.SetCurrentUser(orgUnitId: null, DataScope.Company);
+        var surveyId = await SeedSurveyAsync(env);
+
+        // یک بنچمارک کل‌شرکتی برای NPS — بخش مقایسه را پر می‌کند.
+        var benchmarkService = env.Services.GetRequiredService<IBenchmarkService>();
+
+        var benchmark = await benchmarkService.CreateAsync(new SaveBenchmarkRequest
+        {
+            Name = "هدف NPS سازمانی",
+            Metric = MetricType.Nps,
+            TargetValue = 50m,
+            IsCompanyWide = true
+        });
+
+        benchmark.IsSuccess.Should().BeTrue();
+
+        var service = env.Services.GetRequiredService<IReportingService>();
+
+        var created = await service.CreateAsync(new SaveReportRequest
+        {
+            Name = "گزارش مقایسه بنچمارک",
+            Type = ReportType.BenchmarkComparison,
+            Format = format,
+            SurveyId = surveyId
+        });
+
+        var executed = await service.ExecuteAsync(created.Value!.Id);
+
+        if (executed.IsFailure)
+        {
+            Assert.Fail($"execution failed: {executed.Error.Code} — {executed.Error.Message}");
+        }
+
+        executed.Value!.Status.Should().Be(ReportExecutionStatus.Succeeded);
+        executed.Value.HasArtifact.Should().BeTrue();
+        executed.Value.FileSizeBytes.Should().BeGreaterThan(0);
+
+        // دانلود خروجی باید فایل معتبری برگرداند.
+        var artifact = await service.GetArtifactAsync(executed.Value.Id);
+        artifact.IsSuccess.Should().BeTrue();
+        artifact.Value!.SizeBytes.Should().BeGreaterThan(0);
+
+        await using var stream = artifact.Value.Content;
+        using var buffer = new MemoryStream();
+        await stream.CopyToAsync(buffer);
+        var bytes = buffer.ToArray();
+
+        bytes.Should().NotBeEmpty();
+
+        if (format == ReportFormat.Pdf)
+        {
+            artifact.Value.ContentType.Should().Be("application/pdf");
+            Encoding.ASCII.GetString(bytes, 0, 4).Should().Be("%PDF");
+        }
+        else
+        {
+            artifact.Value.ContentType.Should().Be("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            bytes[0].Should().Be(0x50); // 'P'
+            bytes[1].Should().Be(0x4B); // 'K'
+        }
     }
 
     [Fact]

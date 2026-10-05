@@ -293,19 +293,145 @@ public class SurveyServiceTests
     }
 
     [Fact]
-    public async Task Update_Rejects_Non_Draft_Survey()
+    public async Task Update_On_Draft_Changes_Structural_Fields()
     {
         await using var env = await TestEnvironment.CreateAsync();
         env.SetCurrentUser(orgUnitId: null, DataScope.Company);
         var service = env.Services.GetRequiredService<ISurveyService>();
         var questionnaire = await SeedActiveQuestionnaireAsync(env);
-        var created = (await service.CreateAsync(CreateRequest("SV-UPD", questionnaire.Id))).Value!;
+        var created = (await service.CreateAsync(CreateRequest("SV-DRAFT-UPD", questionnaire.Id, isAnonymous: true))).Value!;
+
+        var start = DateTime.UtcNow.AddDays(7);
+        var result = await service.UpdateAsync(created.Id, new SaveSurveyRequest
+        {
+            Code = "SV-DRAFT-UPD-2",
+            QuestionnaireId = questionnaire.Id,
+            IsAnonymous = false,
+            SingleResponsePerUser = false,
+            StartDate = start,
+            EndDate = start.AddDays(7),
+            EstimatedMinutes = 20,
+            Localizations = [ new SurveyLocalizationDto { Language = Language.Fa, Title = "عنوان جدید" } ]
+        });
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Code.Should().Be("SV-DRAFT-UPD-2");
+        result.Value.IsAnonymous.Should().BeFalse("در حالت پیش‌نویس پرچم ناشناس قابل تغییر است");
+        result.Value.SingleResponsePerUser.Should().BeFalse();
+        result.Value.StartDate.Should().BeCloseTo(start, TimeSpan.FromSeconds(5));
+        result.Value.EstimatedMinutes.Should().Be(20);
+        result.Value.Title.Should().Be("عنوان جدید");
+    }
+
+    [Fact]
+    public async Task Update_On_Active_Survey_Locks_Structural_Fields_Allows_Safe_Fields()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        env.SetCurrentUser(orgUnitId: null, DataScope.Company);
+        var service = env.Services.GetRequiredService<ISurveyService>();
+        var questionnaire = await SeedActiveQuestionnaireAsync(env);
+        var created = (await service.CreateAsync(CreateRequest("SV-UPD-A", questionnaire.Id, isAnonymous: true))).Value!;
         (await service.PublishAsync(created.Id)).IsSuccess.Should().BeTrue();
+        var before = (await service.GetByIdAsync(created.Id)).Value!;
 
-        var result = await service.UpdateAsync(created.Id, CreateRequest("SV-UPD-2", questionnaire.Id));
+        // درخواستی که سعی می‌کند همه‌ی فیلدهای ساختاری را هم تغییر دهد.
+        var end = DateTime.UtcNow.AddDays(20);
+        var result = await service.UpdateAsync(created.Id, new SaveSurveyRequest
+        {
+            Code = "SV-CHANGED",
+            QuestionnaireId = Guid.NewGuid(),
+            IsAnonymous = false,
+            SingleResponsePerUser = false,
+            StartDate = DateTime.UtcNow.AddDays(30),
+            EndDate = end,
+            EstimatedMinutes = 42,
+            AllowEditResponse = false,
+            ShowProgressBar = false,
+            Localizations =
+            [
+                new SurveyLocalizationDto
+                {
+                    Language = Language.Fa,
+                    Title = "عنوان جدید",
+                    Description = "توضیح جدید",
+                    ThankYouMessage = "ممنون"
+                }
+            ]
+        });
 
-        result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("survey_is_not_draft");
+        result.IsSuccess.Should().BeTrue();
+
+        // فیلدهای ساختاری باید دست‌نخورده باقی بمانند.
+        result.Value!.Code.Should().Be("SV-UPD-A");
+        result.Value.QuestionnaireId.Should().Be(questionnaire.Id);
+        result.Value.QuestionnaireCode.Should().Be(questionnaire.Code);
+        result.Value.IsAnonymous.Should().BeTrue("پس از انتشار، پرچم ناشناس قفل می‌شود");
+        result.Value.SingleResponsePerUser.Should().BeTrue();
+        result.Value.StartDate.Should().Be(before.StartDate);
+        result.Value.Status.Should().Be(SurveyStatus.Active);
+
+        // فیلدهای امن باید به‌روز شده باشند.
+        result.Value.Title.Should().Be("عنوان جدید");
+        result.Value.Description.Should().Be("توضیح جدید");
+        result.Value.ThankYouMessage.Should().Be("ممنون");
+        result.Value.EndDate.Should().BeCloseTo(end, TimeSpan.FromSeconds(5));
+        result.Value.EstimatedMinutes.Should().Be(42);
+        result.Value.AllowEditResponse.Should().BeFalse();
+        result.Value.ShowProgressBar.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Update_On_Scheduled_Survey_Keeps_Window_And_Status()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        env.SetCurrentUser(orgUnitId: null, DataScope.Company);
+        var service = env.Services.GetRequiredService<ISurveyService>();
+        var questionnaire = await SeedActiveQuestionnaireAsync(env);
+        var start = DateTime.UtcNow.AddDays(7);
+        var created = (await service.CreateAsync(CreateRequest("SV-UPD-S", questionnaire.Id, startDate: start))).Value!;
+        (await service.PublishAsync(created.Id)).IsSuccess.Should().BeTrue();
+        var before = (await service.GetByIdAsync(created.Id)).Value!;
+        before.Status.Should().Be(SurveyStatus.Scheduled);
+
+        var result = await service.UpdateAsync(created.Id, new SaveSurveyRequest
+        {
+            Code = "SV-UPD-S",
+            QuestionnaireId = questionnaire.Id,
+            StartDate = DateTime.UtcNow.AddDays(30),
+            EndDate = DateTime.UtcNow.AddDays(40),
+            EstimatedMinutes = 10,
+            Localizations = [ new SurveyLocalizationDto { Language = Language.Fa, Title = "عنوان زمان‌بندی‌شده" } ]
+        });
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value!.Status.Should().Be(SurveyStatus.Scheduled);
+        result.Value.StartDate.Should().BeCloseTo(start, TimeSpan.FromSeconds(5), "تاریخ شروع پس از انتشار قفل می‌شود");
+        result.Value.EndDate.Should().BeCloseTo(DateTime.UtcNow.AddDays(40), TimeSpan.FromSeconds(5));
+        result.Value.Title.Should().Be("عنوان زمان‌بندی‌شده");
+    }
+
+    [Fact]
+    public async Task Update_Rejects_Closed_And_Archived_Surveys()
+    {
+        await using var env = await TestEnvironment.CreateAsync();
+        env.SetCurrentUser(orgUnitId: null, DataScope.Company);
+        var service = env.Services.GetRequiredService<ISurveyService>();
+        var questionnaire = await SeedActiveQuestionnaireAsync(env);
+
+        var closed = (await service.CreateAsync(CreateRequest("SV-CLOSED", questionnaire.Id))).Value!;
+        (await service.PublishAsync(closed.Id)).IsSuccess.Should().BeTrue();
+        (await service.CloseAsync(closed.Id)).IsSuccess.Should().BeTrue();
+
+        var closedResult = await service.UpdateAsync(closed.Id, CreateRequest("SV-CLOSED-2", questionnaire.Id));
+        closedResult.IsFailure.Should().BeTrue();
+        closedResult.Error.Code.Should().Be("survey_is_not_editable");
+
+        var archived = (await service.CreateAsync(CreateRequest("SV-ARCHIVED", questionnaire.Id))).Value!;
+        (await service.ArchiveAsync(archived.Id)).IsSuccess.Should().BeTrue();
+
+        var archivedResult = await service.UpdateAsync(archived.Id, CreateRequest("SV-ARCHIVED-2", questionnaire.Id));
+        archivedResult.IsFailure.Should().BeTrue();
+        archivedResult.Error.Code.Should().Be("survey_is_not_editable");
     }
 
     [Fact]

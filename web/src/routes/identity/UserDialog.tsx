@@ -3,8 +3,10 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { usersApi, type CreateUserRequest, type UpdateUserRequest, type UserSummary } from '@/api/users';
 import { ApiError } from '@/api/client';
+import { useAuth } from '@/auth/AuthProvider';
 import { useLanguage } from '@/i18n/LanguageProvider';
 import { queryKeys, useOrgUnits } from '@/api/hooks';
+import { AvatarUploader } from '@/components/ui/avatar-upload';
 import { Dialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
@@ -23,11 +25,13 @@ interface UserDialogProps {
 export function UserDialog({ open, onClose, user }: UserDialogProps) {
   const { t, culture } = useLanguage();
   const queryClient = useQueryClient();
+  const { user: currentUser, refreshUser } = useAuth();
   const isEdit = !!user;
 
   const [form, setForm] = useState(() => createEmptyForm(user));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | undefined>();
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.avatarUrl ?? null);
 
   const { data: orgUnits } = useOrgUnits();
 
@@ -37,8 +41,37 @@ export function UserDialog({ open, onClose, user }: UserDialogProps) {
       setForm(createEmptyForm(user));
       setErrors({});
       setFormError(undefined);
+      setAvatarUrl(user?.avatarUrl ?? null);
     }
   }, [open, user]);
+
+  // بارگذاری/حذف تصویر آواتار کاربر توسط مدیر.
+  const uploadAvatarMutation = useMutation({
+    mutationFn: (file: File) => usersApi.uploadAvatar(culture, user!.id, file),
+    onSuccess: async (updated) => {
+      setAvatarUrl(updated.avatarUrl);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.users });
+
+      // اگر کاربری که مدیر تصویرش را تغییر می‌دهد خودِ کاربر جاری است،
+      // پروفایل او باید به‌روز شود تا آواتار نوار بالا هم عوض شود؛
+      // این همان مکانیزمی است که صفحه‌ی پروفایل استفاده می‌کند.
+      if (currentUser?.id === user!.id) {
+        await refreshUser();
+      }
+    }
+  });
+
+  const removeAvatarMutation = useMutation({
+    mutationFn: () => usersApi.deleteAvatar(culture, user!.id),
+    onSuccess: async () => {
+      setAvatarUrl(null);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.users });
+
+      if (currentUser?.id === user!.id) {
+        await refreshUser();
+      }
+    }
+  });
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -163,6 +196,18 @@ export function UserDialog({ open, onClose, user }: UserDialogProps) {
           </div>
         )}
 
+        {isEdit && user && (
+          <div className="col-span-full rounded-md border bg-card/60 p-3">
+            <AvatarUploader
+              avatarUrl={avatarUrl}
+              displayName={user.displayName}
+              disabled={mutation.isPending}
+              onUpload={(file) => uploadAvatarMutation.mutateAsync(file)}
+              onRemove={removeAvatarMutation.mutateAsync}
+            />
+          </div>
+        )}
+
         {!isEdit && (
           <FormField label={t.users.userName} htmlFor="userName" required error={errors.userName}>
             <Input
@@ -284,7 +329,9 @@ function createEmptyForm(user?: UserSummary | null): UserFormState {
     phoneNumber: '',
     password: '',
     orgUnitId: user?.orgUnitId ?? '',
-    dataScope: '0'
+    // در حالت ویرایش، دامنه‌ی فعلی کاربر نگه داشته می‌شود تا ویرایش،
+    // آن را به‌طور ناخواسته به «Own» بازنشانی نکند.
+    dataScope: user?.dataScope !== undefined ? String(user.dataScope) : '0'
   };
 }
 

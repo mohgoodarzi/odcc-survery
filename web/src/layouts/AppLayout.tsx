@@ -14,6 +14,7 @@ import { useClickOutside } from '@/lib/use-click-outside';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/ui/logo';
+import { Avatar } from '@/components/ui/avatar';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 
 interface NavItem {
@@ -243,6 +244,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
               <UserMenu
                 displayName={user.displayName}
                 userName={user.userName}
+                avatarUrl={user.avatarUrl}
                 onProfile={() => navigate(`/${culture}/profile`)}
                 onLogout={handleLogout}
               />
@@ -261,6 +263,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 interface UserMenuProps {
   displayName: string;
   userName: string;
+  avatarUrl?: string | null;
   onProfile: () => void;
   onLogout: () => void;
 }
@@ -268,7 +271,7 @@ interface UserMenuProps {
 /**
  * منوی کاربر: نام نمایشی، پروفایل و خروج. با کلیک بیرون از منو بسته می‌شود.
  */
-function UserMenu({ displayName, userName, onProfile, onLogout }: UserMenuProps) {
+function UserMenu({ displayName, userName, avatarUrl, onProfile, onLogout }: UserMenuProps) {
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -284,12 +287,7 @@ function UserMenu({ displayName, userName, onProfile, onLogout }: UserMenuProps)
         aria-expanded={open}
         aria-haspopup="menu"
       >
-        <div
-          className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary"
-          aria-hidden
-        >
-          {initials(displayName)}
-        </div>
+        <Avatar src={avatarUrl} displayName={displayName} size="sm" />
         <span className="hidden text-sm font-medium sm:inline">{displayName}</span>
         <ChevronDown className="size-4" />
       </Button>
@@ -337,16 +335,4 @@ function UserMenu({ displayName, userName, onProfile, onLogout }: UserMenuProps)
       )}
     </div>
   );
-}
-
-/** حروف اول نام برای آواتار. */
-function initials(displayName: string): string {
-  const parts = displayName.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '؟';
-
-  if (parts.length === 1) {
-    return parts[0].slice(0, 2);
-  }
-
-  return (parts[0][0] ?? '') + (parts[1][0] ?? '');
 }

@@ -159,6 +159,16 @@ export interface Dictionary {
     dataScope: string;
     memberSince: string;
     noPermissions: string;
+    /** تصویر پروفایل (آواتار). */
+    avatar: string;
+    avatarHint: string;
+    changeAvatar: string;
+    removeAvatar: string;
+    avatarUploading: string;
+    avatarUpdated: string;
+    avatarRemoved: string;
+    avatarInvalidType: string;
+    avatarTooLarge: string;
   };
   users: {
     title: string;
@@ -382,6 +392,10 @@ export interface Dictionary {
     close: string;
     archive: string;
     publishHint: string;
+    /** نکته‌ی قفل بودن فیلدهای ساختاری پس از انتشار. */
+    lockedFieldHint: string;
+    /** یادآوری بالای فرم ویرایش برای نظرسنجیِ منتشرشده. */
+    publishedSurveyEditHint: string;
     surveyCreated: string;
     surveyUpdated: string;
     surveyDeleted: string;

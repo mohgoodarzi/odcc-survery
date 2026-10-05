@@ -244,7 +244,7 @@ public sealed class AuthService(
             FirstName = user.FirstName,
             LastName = user.LastName,
             DisplayName = user.DisplayName,
-            AvatarUrl = user.AvatarUrl,
+            AvatarUrl = AvatarUrlBuilder.Build(user.Id, user.AvatarUrl),
             IsActive = user.IsActive,
             EmailConfirmed = user.EmailConfirmed,
             TwoFactorEnabled = user.TwoFactorEnabled,

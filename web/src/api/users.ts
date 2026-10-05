@@ -1,4 +1,5 @@
-import { apiPost, apiPut, apiRequest } from './client';
+import { apiDelete, apiPost, apiPut, apiRequest } from './client';
+import type { UserProfile } from './auth';
 import type { Culture } from '@/i18n/types';
 
 export interface UserSummary {
@@ -8,10 +9,17 @@ export interface UserSummary {
   firstName: string;
   lastName: string;
   displayName: string;
+  /** نشانی‌ی عمومی تصویر آواتار یا null اگر تصویری وجود ندارد. */
+  avatarUrl: string | null;
   isActive: boolean;
   emailConfirmed: boolean;
   orgUnitId: string | null;
   orgUnitName: string | null;
+  /**
+   * دامنه‌ی دسترسی کاربر به داده‌های سازمانی. در فرم ویرایش برای حفظ مقدار
+   * فعلی استفاده می‌شود تا ویرایش، دامنه را به‌طور ناخواسته بازنشانی نکند.
+   */
+  dataScope: number;
   createdAt: string;
   roles: string[];
 }
@@ -121,5 +129,35 @@ export const usersApi = {
     apiPost<void>(culture, '/identity/users/change-password', request),
 
   assignRoles: (culture: Culture, request: AssignRolesRequest) =>
-    apiPost<void>(culture, '/identity/users/assign-roles', request)
+    apiPost<void>(culture, '/identity/users/assign-roles', request),
+
+  /** بارگذاری یا تعویض تصویر آواتار حساب خود. */
+  uploadMyAvatar: (culture: Culture, file: File) => {
+    const formData = new FormData();
+    formData.append('File', file);
+
+    return apiRequest<UserProfile>(culture, '/identity/users/me/avatar', {
+      method: 'POST',
+      body: formData
+    });
+  },
+
+  /** حذف تصویر آواتار حساب خود. */
+  deleteMyAvatar: (culture: Culture) =>
+    apiDelete<void>(culture, '/identity/users/me/avatar'),
+
+  /** بارگذاری یا تعویض تصویر آواتار یک کاربر (توسط مدیر). */
+  uploadAvatar: (culture: Culture, id: string, file: File) => {
+    const formData = new FormData();
+    formData.append('File', file);
+
+    return apiRequest<UserSummary>(culture, `/identity/users/${id}/avatar`, {
+      method: 'POST',
+      body: formData
+    });
+  },
+
+  /** حذف تصویر آواتار یک کاربر (توسط مدیر). */
+  deleteAvatar: (culture: Culture, id: string) =>
+    apiDelete<void>(culture, `/identity/users/${id}/avatar`)
 };

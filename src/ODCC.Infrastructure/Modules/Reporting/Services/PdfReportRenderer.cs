@@ -17,6 +17,16 @@ namespace ODCC.Infrastructure.Modules.Reporting.Services;
 /// </summary>
 public sealed class PdfReportRenderer : IReportRenderer
 {
+    /// <summary>حاشیه‌ی صفحه بر حسب پوینت (باید با <c>page.Margin</c> هماهنگ باشد).</summary>
+    private const float PageMargin = 28f;
+
+    /// <summary>
+    /// پهنای مفید محتوای صفحه بر حسب پوینت. مجموع عرض ستون‌های ثابت یک جدول
+    /// هرگز نباید از این مقدار بیشتر شود، وگرنه QuestPDF با
+    /// <c>DocumentLayoutException</c> شکست می‌خورد.
+    /// </summary>
+    private static float ContentWidth => PageSizes.A4.Width - 2f * PageMargin;
+
     /// <inheritdoc/>
     public ReportFormat Format => ReportFormat.Pdf;
 
@@ -30,7 +40,7 @@ public sealed class PdfReportRenderer : IReportRenderer
             container.Page(page =>
             {
                 page.Size(PageSizes.A4);
-                page.Margin(28);
+                page.Margin(PageMargin);
                 page.ContentFromRightToLeft();
                 page.DefaultTextStyle(style => style
                     .FontFamily(ReportFontLoader.FontFamily)
@@ -130,10 +140,31 @@ public sealed class PdfReportRenderer : IReportRenderer
         {
             table.ColumnsDefinition(columns =>
             {
-                foreach (var column in section.Columns)
+                // عرض پیشنهادی هر ستون به پوینت تبدیل می‌شود و در محدوده‌ی
+                // خوانا قرار می‌گیرد.
+                var widths = section.Columns
+                    .Select(column => Math.Clamp((float)column.Width * 0.75f, 40f, 220f))
+                    .ToArray();
+
+                var total = widths.Sum();
+
+                // اگر مجموع عرض ستون‌ها از پهنای مفید صفحه بیشتر شود، QuestPDF
+                // قادر به چیدمان نیست و DocumentLayoutException پرتاب می‌کند
+                // (در گزارش‌های پهن‌تر مثل «مقایسه با بنچمارک» رخ می‌داد). در
+                // این حالت همه‌ی ستون‌ها به‌نسبت هم کوچک می‌شوند تا جدول دقیقاً
+                // در پهنای صفحه جا شود و نسبت‌ها حفظ بمانند.
+                if (total > ContentWidth)
                 {
-                    // عرض ستون از پوینت بسته‌ی داده به نسبت اندازه‌ی A4 تبدیل می‌شود.
-                    columns.ConstantColumn(Math.Clamp((float)column.Width * 0.75f, 40f, 220f));
+                    var scale = ContentWidth / total;
+                    for (var i = 0; i < widths.Length; i++)
+                    {
+                        widths[i] *= scale;
+                    }
+                }
+
+                foreach (var width in widths)
+                {
+                    columns.ConstantColumn(width);
                 }
             });
 

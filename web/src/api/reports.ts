@@ -1,4 +1,4 @@
-import { apiDelete, apiPut, apiRequest } from './client';
+import { apiDelete, apiPut, apiRequest, requestResource } from './client';
 import type { Culture } from '@/i18n/types';
 import type { PagedResult } from './surveys';
 
@@ -241,18 +241,15 @@ export const reportsApi = {
     apiRequest<ReportExecution>(culture, `/reports/executions/${executionId}`, { signal }),
 
   /**
-   * دانلود فایل خروجی یک اجرای موفق. یک URL blob برمی‌گرداند که فراخوان
-   * باید آن را revoke کند. نوع محتوا بر اساس قالب گزارش تنظیم می‌شود.
+   * دانلود فایل خروجی یک اجرای موفق. یک Blob برمی‌گرداند که فراخوان باید آن
+   * را به نشانی موقت تبدیل کرده و در پایان آزاد کند.
+   *
+   * **چرا از <c>requestResource</c> استفاده می‌شود:** این اندپوینت نیازمند
+   * توکن احراز هویت است. فراخوانی مستقیم <c>fetch</c> هدر <c>Authorization</c>
+   * را ارسال نمی‌کرد و دانلود همواره با ۴۰۱ شکست می‌خورد. این کمک‌کننده توکن
+   * را اضافه می‌کند و در صورت دریافت ۴۰۱ یک‌بار توکن را تازه‌سازی و دوباره
+   * تلاش می‌کند.
    */
-  downloadArtifact: async (culture: Culture, executionId: string): Promise<Blob> => {
-    const response = await fetch(`/api/${culture}/reports/executions/${executionId}/artifact`, {
-      credentials: 'same-origin'
-    });
-
-    if (!response.ok) {
-      throw new Error(`دانلود خروجی گزارش با وضعیت ${response.status} شکست خورد.`);
-    }
-
-    return response.blob();
-  }
+  downloadArtifact: (culture: Culture, executionId: string, signal?: AbortSignal): Promise<Blob> =>
+    requestResource(`/api/${culture}/reports/executions/${executionId}/artifact`, signal)
 };

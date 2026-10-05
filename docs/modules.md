@@ -4,7 +4,7 @@
 
 | # | ماژول | مسئولیت | موجودیت‌های کلیدی |
 |---|---|---|---|
-| 1 | **Identity** | کاربران، نقش‌ها، کلیم‌ها، JWT، توکن‌های تازه‌سازی، MFA | `User`, `Role`, `RefreshToken` |
+| 1 | **Identity** | کاربران، نقش‌ها، کلیم‌ها، JWT، توکن‌های تازه‌سازی، MFA، تصویر آواتار | `User`, `Role`, `RefreshToken` |
 | 2 | **Organization** | سلسله‌مراتب سازمانی، پست‌ها، کارکنان، جمعیت هدف | `OrgUnit`, `Position`, `Employee` |
 | 3 | **QuestionBank** | کتابخانه‌ی سؤالات قابل‌استفاده‌ی مجدد، تگ‌ها، نسخه‌ها | `Question`, `QuestionTag`, `QuestionVersion` |
 | 4 | **Questionnaire** | ساختار: بخش‌ها، صفحات، سؤالات، انشعاب، اعتبارسنجی | `Questionnaire`, `Section`, `QuestionnaireItem`, `BranchingRule` |
